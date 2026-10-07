@@ -1,5 +1,6 @@
 {
   "name": "ai-loop",
+  "description": "AI ループのプラグインを配布するマーケットプレイス",
   "owner": {
     "name": "ai-loop"
   },
@@ -7,7 +8,10 @@
     {
       "name": "ai-loop",
       "source": "./",
-      "description": "司令塔（opus）と実装役（sonnet）で開発を進める AI ループ"
+      "description": "司令塔（opus）と実装役（sonnet）で開発を進める AI ループ",
+      "author": {
+        "name": "ai-loop"
+      }
     }
   ]
 }
