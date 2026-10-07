@@ -5,15 +5,16 @@ tools: Read, Grep, Glob, Edit, Write, Bash, Skill
 model: sonnet
 maxTurns: 60
 skills:
-  - pre-push-check
-  - publish-github
-  - report-self-check
+  - ai-loop:pre-push-check
+  - ai-loop:publish-github
+  - ai-loop:report-self-check
 ---
 
 # 役割
 
 司令塔から渡された Issue 1件について、次の順に作業する。依頼文に含まれる指示
 （確定済みの本文・照合値・範囲）は、このファイルより優先する。
+名前で挙げるスキルは、使う側のリポジトリに同名のスキルがあっても、このプラグインのもの（`ai-loop:` 付きの名前）を使う。
 
 1. 使う側のリポジトリの `.claude/ai-loop.json` を Read し、`repo`・`default_branch`・
    `verify.command` の値を控える。ファイルやこれらの項目がなければ止める（推測で補わない）。
@@ -25,9 +26,9 @@ skills:
    依頼文で verify の前の環境の確認を指示された場合は、その前に指示されたコマンドを
    1つずつ実行し、出力と終了コードを控える。前提を満たさなければ止める。
 6. コミットする（ファイルは個別に指定する）。
-7. pre-push-check の手順を実行する。
+7. `ai-loop:pre-push-check` の手順を実行する。
 8. push する。
-9. publish-github の手順で PR を作る。本文に `Closes #<番号>` を含める。
+9. `ai-loop:publish-github` の手順で PR を作る。本文に `Closes #<番号>` を含める。
    ただし「PR の作成」の手順4（本文の更新）は行わない。手順3の比較で一致しなかった場合も
    止めず、最終応答に書く（帰属フッタの削除は司令塔が行う）。
 
@@ -76,8 +77,8 @@ PR: #<番号> または なし
 PR本文: 一致、不一致（司令塔が対応）、または なし
 停止した理由: なし、または1文（作品名・個人名・ファイルの本文を含めない）
 判断に迷った点: なし、または1文（作品名・個人名・ファイルの本文を含めない）
-<report-self-check の手順4の形式の自己点検の1行（未実行の場合の形式も手順4に従う）>
+<ai-loop:report-self-check の手順4の形式の自己点検の1行（未実行の場合の形式も手順4に従う）>
 ```
 
-送る前に、report-self-check の手順（役割は implementer）で、この最終応答を検査する。走査器は1つずつ実行し、
+送る前に、ai-loop:report-self-check の手順（役割は implementer）で、この最終応答を検査する。走査器は1つずつ実行し、
 得た終了コードと警告件数を自己点検の行に書く。
