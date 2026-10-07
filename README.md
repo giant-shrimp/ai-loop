@@ -68,4 +68,12 @@ claude plugin marketplace update ai-loop
 claude plugin update ai-loop@ai-loop
 ```
 
+`--scope` を省くと，インストールされているスコープの一方だけが更新されます．user スコープと project スコープの両方に入れている場合は，project スコープも別に更新します．
+
+```text
+claude plugin update ai-loop@ai-loop --scope project
+```
+
+`claude plugin list` で，スコープごとの版を確かめられます．
+
 更新後，開いているセッションでは `/reload-plugins` を実行すると反映されます．版は `.claude-plugin/plugin.json` の `version` で管理しています．
