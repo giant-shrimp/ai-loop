@@ -7,6 +7,7 @@ description: Use this skill whenever the user reports that they merged a PR via 
 
 PRのマージは常に人間がGitHub GUIで行う．このスキルは，マージ**後**の定型後始末を実行する．
 最初に `.claude/ai-loop.json` を Read する．ファイルがない，または `repo`・`default_branch`・`verify` がない場合は，ここで止めて報告する（推測で補わない）．
+同じ会話ですでに Read していて，その後このファイルを変えていない場合は，読み直さなくてよい（Read ツールが「変化なし」と返した場合も読んだものとみなす）．
 以下の `<repo>` は `repo` の値，`<所有者>` はその `/` より前の部分，`<default_branch>` は `default_branch` の値に置き換える．
 
 ## いつ使うか
