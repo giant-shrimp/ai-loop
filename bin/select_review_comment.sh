@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# claude-review.yml のトラッキングコメントを、PRのコメント一覧JSON配列
+# Claude Code の PR レビュー（claude-code-action）のトラッキングコメントを、PRのコメント一覧JSON配列
 # から特定する。ネットワーク・gh CLIには一切触れず、渡されたJSONだけで
-# 完結する（scripts/check_review_comment.sh と同じ設計方針。ADR-006
-# 作業12-2）。
+# 完結する（check_review_comment.sh と同じ設計方針）。
 #
 # 特定方法は単一経路: 本文に "actions/runs/<run_id>" を含む最新コメント。
 #   anthropics/claude-code-action の src/entrypoints/
@@ -15,9 +14,9 @@
 #   自体も同じrun IDを埋め込む（createJobRunLink経由）ため、
 #   「更新後」でも「未更新のまま」でも一致する。
 #
-# 【設計変更・ADR-019】以前はauthor.loginが"github-actions[bot]"である
+# 【設計変更】以前はauthor.loginが"github-actions[bot]"である
 # 最新コメントへのフォールバック（2次経路）を持っていたが、実測でこの経路が
-# 実運用では発火しないことが判明したため削除した（Issue #207、ADR-019）。
+# 実運用では発火しないことが判明したため削除した。
 #
 # 依存: jq。GitHub Actions ubuntu-latestランナーには公式に jq 1.7 が
 # プリインストールされている（actions/runner-images
