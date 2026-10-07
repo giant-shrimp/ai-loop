@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #
-# Claude PR Review（Phase 5 Step 1）のトラッキングコメント本文を検査し、
+# Claude Code の PR レビュー（claude-code-action）のトラッキングコメント本文を検査し、
 # 実質的なレビューが書かれているかを判定する。ネットワーク・gh CLIには
 # 一切触れず、渡された本文だけで完結する。
 #
 # 切り出した理由: 判定ロジックを .github/workflows/ の中に直書きすると、
-# その領域は Claude Code へ deny（ADR-004決定3）でテストが書けず、
-# 「わざと壊して確認する」（CLAUDE.md）を本番runでしか実施できない。
-# これは verify.sh を deny している理由と同じ構造の問題だったため、
-# ロジックをこのスクリプトへ切り出した（ADR-006 作業9-1）。
+# その領域を Claude Code の編集禁止（deny）にしている場合はテストが書けず、
+# 「わざと壊して確認する」ことを本番の実行でしか行えない。
+# そのため、ロジックをこのスクリプトへ切り出した。
 #
 # 使い方:
 #   check_review_comment.sh < comment_body.txt
@@ -20,16 +19,16 @@
 #       （Claudeが update_claude_comment を最後まで呼び終えていない）
 #   2 = 本文が短すぎる（閾値未満）
 #
-# 判定根拠: ERRORS.md「claude-review.yml（Phase 5 Step 1）」、
-# ADR-006（docs/decisions/ADR-006-phase5-step1-redesign.md）を参照。
+# 判定根拠: claude-code-action が生成するコメント本文の実測と一次情報
+# （下記の各定数の説明を参照）。
 # 対象コメントの特定方法（author.login等）はワークフロー側の責務であり、
 # このスクリプトは渡された本文だけを見る。
 #
-# fail-openの穴（Issue #94）への対応: tagモードの初期進捗テンプレート
+# fail-openの穴への対応: tagモードの初期進捗テンプレート
 # （「### レビュー進行中」、チェック項目がすべて未完了の`- [ ] `のまま）は、
 # 旧来のプレースホルダ残骸検出（PLACEHOLDER_RESIDUE）にも文字数閾値にも
 # 引っかからず、誤ってexit 0（実質的なレビューあり）を返していた
-# （PR #92, run 31160930257で実測、`error_max_turns`によりstep自体は
+# （実運用の実行で実測、`error_max_turns`によりstep自体は
 # 失敗したため実害は無かったが、fail-closed原則の穴として記録
 # されていた）。この穴を塞ぐため、本文の**全文**（`---`区切り線より前の
 # ヘッダー行を含む）を対象にした判定を追加した（_check_header・
@@ -40,21 +39,20 @@
 set -euo pipefail
 
 # 文字数カウントの単位をUTF-8文字数に固定する（バイト数にしない）。
-# GitHub Actions ランナーの既定ロケールに依存させない（作業9-3）。
+# GitHub Actions ランナーの既定ロケールに依存させない。
 export LC_ALL=C.UTF-8
 
 # anthropics/claude-code-action の一次情報（src/github/operations/comments/
 # common.ts の createCommentBody()、comment-logic.ts の updateCommentBody()）
 # から機械的にトレースして確認した、初期プレースホルダの残骸となる固定文字列。
 # Claudeが update_claude_comment を一度も呼ばずに終了すると、最終コメントの
-# 区切り線（---）直後にこの文がそのまま残る（ADR-006参照）。
+# 区切り線（---）直後にこの文がそのまま残る。
 PLACEHOLDER_RESIDUE="I'll analyze this and get back to you."
 
 # tagモードの初期進捗テンプレート（「### レビュー進行中」）が持つ、
-# 未完了チェックボックスの行頭マーカー。実データ（PR #92・PR #98・PR #99の
-# 実行中プレースホルダ）で確認済み。完了レビューの本文にこのマーカーが
-# 出現した例は、実測7点（PR #90・#92・#95・#96・#97・#98・#99）の中には
-# 無い（Issue #94参照）。
+# 未完了チェックボックスの行頭マーカー。実データ（実行中のプレースホルダ
+# 3点）で確認済み。完了レビューの本文にこのマーカーが出現した例は、
+# 実測7点の中には無い。
 INCOMPLETE_CHECKBOX_MARKER="- [ ] "
 
 # 実質的なレビューとみなす本文の最小文字数（UTF-8文字数）。
@@ -85,7 +83,7 @@ fi
 # "**Claude finished ..."（成功）または"**Claude encountered an error ..."
 # （失敗）のいずれかに固定して生成する。このヘッダーはClaude自身の
 # 応答内容に左右されない機械生成の固定テンプレートであるため、
-# 実データ7点（PR #90・#92・#95・#96・#97・#98・#99）すべてで
+# 実データ7点すべてで
 # この2パターンのいずれかに一致することを確認済み。
 
 _check_header() {
