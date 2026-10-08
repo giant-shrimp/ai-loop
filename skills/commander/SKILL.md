@@ -11,7 +11,7 @@ disable-model-invocation: true
 
 ## 設定
 
-最初に、使う側のリポジトリの `.claude/ai-loop.json` を Read し、`repo`・`default_branch`・`verify.command` の値を控える。ファイルやこれらの項目がなければ、止めてユーザに報告する（推測で補わない）。`records.errors` があれば、その値も控える。以下の `<repo>`・`<default_branch>`・`verify.command`・`records.errors` は、この値を指す。
+最初に、使う側のリポジトリの `.claude/ai-loop.json` を Read し、`repo`・`default_branch`・`verify.command` の値を控える。ファイルやこれらの項目がなければ、止めてユーザに報告する（推測で補わない）。`records.errors` があれば、その値も控える。`report.show_titles` があれば、その値も控える（ない場合は false とする）。以下の `<repo>`・`<default_branch>`・`verify.command`・`records.errors` は、この値を指す。
 
 続けて、作業ツリーが `<repo>` のものであることを確かめる。`git remote get-url origin | grep -c -F '<repo>'` の出力が 1 であることを確かめ、0 なら止めてユーザに報告する（出力は件数だけなので、リモート URL は報告に出ない）。
 
@@ -37,7 +37,7 @@ disable-model-invocation: true
    - 目的、変更（変更するファイル）、完了条件（`verify.command` で確かめられる形）、範囲外、依存関係。文書（スキル・エージェント・ADR・docs など）が対象の Issue では、完了条件を `verify.command` の通過に加えて grep・wc・git diff の値で定める。完了条件を grep の件数で定める場合、削除行の数は grep でなく `git diff --numstat` の値で定め、オプションの有無は短い形と長い形の両方を数える
    - ユーザの作業が要る場合はその内容（deny 対象・ask 対象の変更など）。変更後の全文を司令塔が /tmp に確定するか実装役が書くかも、Issue を作る前に決めて書く。司令塔が確定する場合は、変更後の全文を先に /tmp に確定し、その sha256・行数との一致を完了条件に書いてから Issue を作る
    - 重要な変更（3ファイル以上の変更、公開インタフェースやデータ構造の変更、取り消しにくい変更）に当たるかどうか
-4. Issue の一覧と本文の案をユーザに示す。タイトルは /tmp のファイル（例：`/tmp/<名前>_title.txt`）に確定し、報告ではタイトルそのものを書かず、パスと sha256 で示す（ユーザはファイルを開いて確かめる）。ユーザが承認するまで Issue を作らない。
+4. Issue の一覧と本文の案をユーザに示す。タイトルは /tmp のファイル（例：`/tmp/<名前>_title.txt`）に確定する。`report.show_titles` が false なら、報告ではタイトルそのものを書かず、パスと sha256 で示す（ユーザはファイルを開いて確かめる）。true なら、タイトルそのものも報告に書く（ユーザはファイルを開かずに承認できる）。ユーザが承認するまで Issue を作らない。
 5. 承認後、Issue を REST で作る（`gh api repos/<repo>/issues -f title="$(cat <タイトルのファイル>)" -F body=@<本文のファイル>`）。`$(...)` は末尾の改行を落とすので、タイトルに改行は入らない。作成直後に番号と本文の sha256 を照合する。
 
 ## 2. 下流：実装役への依頼
@@ -99,6 +99,6 @@ ask 対象のファイル（`.claude/settings.json` の ask を参照）は、�
 
 ## 報告の規則
 
-ユーザへの報告では、実在の作品名・個人名・Issue と PR のタイトル・コミットの件名・リモート URL を書かない。所在は相対パスと行番号（`records.errors` の記録は番号と行範囲）で示す。行番号は、書く前に `cat -n` で確かめる。報告を送る前に report-self-check の手順（役割は commander）を実行する。
+ユーザへの報告では、実在の作品名・個人名・Issue と PR のタイトル・コミットの件名・リモート URL を書かない。ただし `report.show_titles` が true なら、Issue と PR のタイトル・コミットの件名は書いてよい（実在の作品名・個人名を含むものを除く）。所在は相対パスと行番号（`records.errors` の記録は番号と行範囲）で示す。行番号は、書く前に `cat -n` で確かめる。報告を送る前に report-self-check の手順（役割は commander）を実行する。
 
 「全文を書き写す」指示とこの規則が食い違う場合は、この規則を優先する。該当する行は書き写さず、その位置に「（記載規則に該当する行のため省略：N行）」とだけ書く。
