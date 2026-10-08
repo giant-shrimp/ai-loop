@@ -120,14 +120,16 @@ Claude Code のセッションで次を実行します．
 
 ```text
 claude plugin marketplace update ai-loop
-claude plugin update ai-loop@ai-loop
+claude plugin update ai-loop@ai-loop --scope user
 ```
 
-`--scope` を省くと，インストールされているスコープの一方だけが更新されます．user スコープと project スコープの両方に入れている場合は，project スコープも別に更新します．
+`--scope` は必ず明示します．省くと，インストールされているスコープの一方だけが更新され，user スコープが古い版のまま残ることがあります．project スコープにも入れている場合は，導入したリポジトリのセッションで次を実行します．
 
 ```text
 claude plugin update ai-loop@ai-loop --scope project
 ```
+
+project スコープの導入はリポジトリごとに別です．導入していないリポジトリで `--scope project` を実行すると，別のリポジトリの導入が更新されることがあります．project スコープの更新は，導入したリポジトリごとに行います．
 
 `claude plugin list` で，スコープごとの版を確かめられます．
 
