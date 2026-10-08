@@ -64,7 +64,7 @@ disable-model-invocation: true
 待機の2文で応答を終えた後は、もう一方が届いても司令塔の応答が再開しないことがあるため、ユーザの続きの合図で再開する。合図を受けた応答では、まず到着の状況（最終応答のメッセージと完了通知のどちらが届いたか）を事実で書く。一方しか届いていなければ照合のコマンドを実行せず、ListAgents を1回だけ使って結果をユーザに報告し、止める。結果は次のように読む。実装役の行が running で出ていれば、実装役は実行中である。running の行がなければ、実装役は実行中ではない（完了か停止かはこの結果では区別しない）。実装役の再開・停止・再起動はしない。両方が届いていれば、次を行う。
 
 - 報告をそのまま信じず、`git log`・`git diff --numstat`・コミット件名・PR タイトル・PR 本文の sha256 を司令塔が自分で確かめる。実装役の最終応答をユーザへの報告に含めるときは、司令塔の report-self-check の下書きに含めて走査する（実装役が自己点検を実行できなかったと書いていた場合も同じ）。
-- 照合の前に `git fetch` を行い、git のコマンドは ref を明示する（例：`git log --format='%h' origin/<default_branch>..origin/<ブランチ>`、`git diff --numstat origin/<default_branch>...origin/<ブランチ>`）。今いるブランチに左右されないようにするため。コミット件名は `git log -1 --format='%s' origin/<ブランチ> > /tmp/<名前>_subject.txt`、PR タイトルは `gh api repos/<repo>/pulls/<番号> --jq .title > /tmp/<名前>_title.txt` で保存し、実装役に渡したファイルと sha256 を照合する（値は報告に書かない）。
+- 照合の前に `git fetch` を行い、git のコマンドは ref を明示する（例：`git log --format='%h' origin/<default_branch>..origin/<ブランチ>`、`git diff --numstat origin/<default_branch>...origin/<ブランチ>`）。今いるブランチに左右されないようにするため。コミット件名は `git log -1 --format='%s' origin/<ブランチ> > /tmp/<名前>_subject.txt`、PR タイトルは `gh api repos/<repo>/pulls/<番号> --jq .title > /tmp/<名前>_title.txt` で保存し、実装役に渡したファイルと sha256 を照合する。件名とタイトルそのものは、`report.show_titles` が true のときだけ報告に書いてよい（false なら、照合の結果だけを書く）。
 - 実装役が止まった場合は、理由をユーザに報告する。理由が分類器の拒否・まとめたコマンドの拒否のどちらかなら、diagnose-failure の手順で種類と既知の対処を確かめ、報告に添える。司令塔は回復を試みない。
 - ユーザの判断で同じ作業を続ける場合は、Agent ツールで新しく呼び直さず、SendMessage で同じ実装役を再開する（文脈が保たれる）。
 - 実装役が拒否された操作を、司令塔が肩代わりしない。

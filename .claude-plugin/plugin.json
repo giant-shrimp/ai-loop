@@ -1,6 +1,6 @@
 {
   "name": "ai-loop",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "description": "司令塔（opus）と実装役（sonnet）で開発を進める AI ループ",
   "author": {
     "name": "ai-loop"
