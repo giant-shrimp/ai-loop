@@ -49,7 +49,7 @@ Claude Code のセッションで次を実行します．
 
 使う側のリポジトリに `.claude/ai-loop.json` を置きます．リポジトリ名・既定ブランチ・検証コマンド・走査器などを書きます．項目と例は [docs/config.md](docs/config.md) にあります．ファイルや必要な項目がない場合，スキルは推測で補わずに止まります．
 
-コミット・PR に帰属行が付かないように，使う側のリポジトリの `.claude/settings.json` で Claude Code の `attribution` 設定を空にしておくことを勧めます．
+コミット・PR に帰属行が付かないように，使う側のリポジトリの `.claude/settings.json`（ローカル専用で導入する場合は `.claude/settings.local.json`）で Claude Code の `attribution` 設定を空にしておくことを勧めます．
 
 司令塔は既定では，Issue のタイトルを報告に書かず，/tmp のファイルで示します．スマートフォンからの遠隔操作などでファイルを開けない場合は，`.claude/ai-loop.json` に `"report": {"show_titles": true}` を足すと，タイトルも報告に書きます．
 

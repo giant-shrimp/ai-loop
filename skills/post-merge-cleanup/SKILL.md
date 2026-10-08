@@ -59,7 +59,7 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
      で `state` が `open` のままでも，クローズのコマンド案は提示しない．
      `Closes #N` による自動クローズはマージから遅れて反映されることがあるため，
      open のままである旨だけを報告し，時間をおいて再確認するよう案内する
-     （`gh issue close` は `.claude/settings.json` の deny 対象）．
+     （`gh issue close` は `.claude/settings.json` または `.claude/settings.local.json` の deny 対象）．
    - **番号の指定がなく，抽出した番号が0件，または異なる複数の番号だった場合**: 自動判定は行わず，
      「対応Issueを特定できなかった」旨を報告するに留める（無関係なIssueを
      誤ってクローズ候補として提示しないため）．
