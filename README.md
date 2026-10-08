@@ -51,6 +51,57 @@ Claude Code のセッションで次を実行します．
 
 コミット・PR に帰属行が付かないように，使う側のリポジトリの `.claude/settings.json` で Claude Code の `attribution` 設定を空にしておくことを勧めます．
 
+## ローカル専用で導入する（リポジトリにファイルを残さない）
+
+研究用のリポジトリなど，ai-loop の設定・検証コマンド・記録を一切コミットしたくない場合の導入方法です．ai-loop 関係のファイルをすべて `.claude/` の下に置き，git の手元だけの除外リストで除外します．ループで作ったコードや文書は，通常どおり PR で push されます．
+
+**1. 除外する**．手元だけの除外リスト `.git/info/exclude` に次の1行を足します．このファイル自体は push されません．`.gitignore` に書くと，その行がコミットされるので使いません．
+
+```text
+/.claude/
+```
+
+**2. 3つのファイルを置く**．
+
+| ファイル | 中身 |
+|---|---|
+| `.claude/ai-loop.json` | 設定．`verify.command` と `records` は `.claude/ai-loop/` の下を指す（下の例） |
+| `.claude/ai-loop/verify.sh` | 検証コマンド．リポジトリのテストを実行し，結果に応じて `VERIFY PASSED` か `VERIFY FAILED` を出す |
+| `.claude/settings.local.json` | `attribution` を空にする設定と，権限の deny（検証コマンドと設定ファイルの編集，既定ブランチへの push，マージなど） |
+
+権限と `attribution` は，コミットされる前提の `.claude/settings.json` ではなく `.claude/settings.local.json` に書きます．
+
+**3. 確かめる**．`git status --porcelain --ignored` に `!! .claude/` が出て，`git check-ignore -v .claude/ai-loop.json` が `.git/info/exclude` の行を示せば，除外できています．
+
+除外したファイルは `git add` しても追加されない（`-f` を付けない限り）ので，実装役が誤ってコミットすることはありません．なお，Issue と PR は git ではなく GitHub に残ります．
+
+`.claude/ai-loop.json` の例：
+
+```json
+{
+  "repo": "example-owner/example-repo",
+  "default_branch": "main",
+  "python": "python3",
+  "verify": {
+    "command": "bash .claude/ai-loop/verify.sh",
+    "pass_marker": "VERIFY PASSED",
+    "fail_marker": "VERIFY FAILED",
+    "summary_markers": [" passed", " failed", "VERIFY "],
+    "deny": true
+  },
+  "scanners": [
+    {"name": "個人情報走査", "command": "check_no_personal_info.py", "added_lines_only": false}
+  ],
+  "extra_checks": [],
+  "records": {
+    "errors": ".claude/ai-loop/ERRORS.md",
+    "errors_inventory": ".claude/ai-loop/errors_inventory.md",
+    "decisions": ".claude/ai-loop/decisions/",
+    "trials": ".claude/ai-loop/trials/"
+  }
+}
+```
+
 ## 使い方
 
 1. 使う側のリポジトリで `claude --model opus` を起動し，`/ai-loop:commander` と入力します．
