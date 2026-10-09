@@ -43,7 +43,7 @@ Claude Code のセッションで次を実行します．
 /plugin install ai-loop@ai-loop
 ```
 
-シェルからは `claude plugin marketplace add giant-shrimp/ai-loop` と `claude plugin install ai-loop@ai-loop` でも同じことができます．非公開のリポジトリなので，手元の git の認証（`gh auth login` など）で clone できる必要があります．
+シェルからは `claude plugin marketplace add giant-shrimp/ai-loop` と `claude plugin install ai-loop@ai-loop` でも同じことができます．
 
 ## 設定
 
