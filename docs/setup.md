@@ -39,7 +39,7 @@ ai-loop を使う側のリポジトリを整え，1件目の Issue を PR のマ
 
 ほかの項目（`repo`・`default_branch`・`scanners` など）は config.md の例に従う．
 
-`.claude/ai-loop.json` を置くと，このプラグインのフックが，1回の応答で2つ以上のツール呼び出しを止める．無効にするには `"one_tool_guard": false` を足す（[config.md](config.md)）．確認した版は Claude Code 2.1.296 の `claude -p` で，対話セッションでは確認していない．
+`.claude/ai-loop.json` を置くと，このプラグインのフックが，1回の応答で2つ以上のツール呼び出しを止める．無効にするには `"one_tool_guard": false` を足す（[config.md](config.md)）．確認した版は Claude Code 2.1.296 で，`claude -p` と対話セッションの両方で確かめている．
 
 ## 2. 検証コマンド
 
