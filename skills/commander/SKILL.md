@@ -90,6 +90,10 @@ deny 対象のファイル（`.claude/settings.json` または `.claude/settings
 3. ユーザが GitHub の Web でファイルを編集し、ブランチと PR を作る。PR 本文には `Closes #<番号>` を入れる。
 4. 司令塔は `git fetch` の後、`git show origin/<ブランチ>:<パス>` で /tmp に取り出し、sha256・行数を確定版と照合する。併せてコミット数・トレーラ・name-status・numstat を照合する。モバイルの GitHub Web で編集すると末尾の改行が落ちることがある。食い違えば止め、ユーザが GitHub の Web で直す。Claude Code は直さない。
 5. ローカルでは取り出した版の照合だけを行い、`verify.command` と pre-push-check は行わない（verify は CI に任せる。sha256 の一致で確定版と同じ中身だと分かり、確定版は渡す前に走査しているため）。その後、「3. 上流2」で CI と review を確かめ、ユーザがマージし、「5. マージの後」に進む。Web で作ったブランチはローカルにないので、ローカルのブランチ削除はない。
+   - ただし、PR の head のコミットの check-runs（`gh api repos/<repo>/commits/<sha>/check-runs`）が0件の場合（CI がないリポジトリ）は、取り出した版の照合の後に、司令塔が手元の worktree で `verify.command` を実行する。worktree はリポジトリのルートで `git worktree add --detach /tmp/<名前>_wt origin/<ブランチ>` を実行して作る。作った後、verify の前に、`git -C /tmp/<名前>_wt rev-parse HEAD` が PR の head の sha と一致することを確かめる。違えば止めてユーザに報告する。
+   - verify は、1回の Bash で `cd /tmp/<名前>_wt && <verify.command>` として実行する（外への cd は次のコマンドで元に戻されることがあるため。この1行に限り、Bash の中でコマンドを続けてよい）。`verify.command` が追跡されていないファイル（`.claude/` 以下など）を使う場合は、そのパスをリポジトリのルートからの絶対パスに置き換える。絶対パスで呼ぶときは、そのスクリプトが worktree のファイルを検査すること（カレントディレクトリか `git rev-parse --show-toplevel` を基準にしていること）を事前に確かめる。スクリプト自身の置き場所（`$0` や `BASH_SOURCE`）を基準にしている場合は元の作業ツリーを検査してしまうので、実行せずに止めてユーザに報告する。
+   - 終了コードを記録した後、リポジトリのルートで `git worktree remove /tmp/<名前>_wt` を実行して worktree を消す（`--force` は使わない。消せなければ止めてユーザに報告する）。
+   - この実行の終了コードを、「3. 上流2」の 1 の `verify.command` の結果とする。0 以外なら、マージの依頼に進まず、diagnose-failure の手順で診断してユーザに報告する。Claude Code は直さない。
 
 ask 対象のファイル（`.claude/settings.json` または `.claude/settings.local.json` の ask を参照）は、次の方式で進める。変更後の全文を上の 1 と同じ方法で /tmp に用意し、sha256・行数・差分を示し、Issue を作る前に、AskUserQuestion の1問で、Issue の作成と反映（実装役の cp）の両方についてユーザの同意を得る。cp の前に AskUserQuestion で改めて同意を取らない。同意の後、Issue を作り、実装役が cp で反映する。反映時は ask の設定で承認画面が出るのでユーザが承認するが、コマンドの書き方によっては出ないため、承認画面の有無を合否の条件にしない。司令塔は実装役の完了後に、「2. 下流」の照合と併せて cmp で照合する。
 
