@@ -27,6 +27,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 | エージェント | `auditor` | 報告や変更を記載規則に照らす監査役（読み取り専用） |
 | bin | `check_no_personal_info.py` | 個人情報・絶対パスの走査器 |
 | bin | `check_review_comment.sh`・`select_review_comment.sh` | review のコメントの特定と判定の補助 |
+| フック | `hooks/hooks.json`・`bin/one_tool_guard.py` | 1回の応答で2つ以上のツール呼び出しを止める |
 
 ## 前提
 
@@ -54,6 +55,14 @@ Claude Code のセッションで次を実行します．
 コミット・PR に帰属行が付かないように，使う側のリポジトリの `.claude/settings.json`（ローカル専用で導入する場合は `.claude/settings.local.json`）で Claude Code の `attribution` 設定を空にしておくことを勧めます．
 
 司令塔は既定では，Issue のタイトルを報告に書かず，/tmp のファイルで示します．スマートフォンからの遠隔操作などでファイルを開けない場合は，`.claude/ai-loop.json` に `"report": {"show_titles": true}` を足すと，タイトルも報告に書きます．
+
+## ツール呼び出しを1つに制限するフック
+
+このプラグインは，1回の応答で2つ以上のツール呼び出しを出すことを止めるフック（`hooks/hooks.json`・`bin/one_tool_guard.py`）を含みます．PreToolUse で呼び出しを数え，同じ応答の2つ目以降を実行前に拒否します．拒否の理由はモデルに返り，次の応答で1つずつ出し直させます．数は，ツールの一括実行の後（PostToolBatch）とユーザの入力（UserPromptSubmit）で0に戻します．メインのセッションとサブエージェントは別に数えます．
+
+フックが働くのは，使う側のリポジトリに `.claude/ai-loop.json` があるときだけです．無効にするには，`.claude/ai-loop.json` に `"one_tool_guard": false` を足します．フック自体の不具合で失敗した場合は，拒否せずに通します．
+
+確認した版は Claude Code 2.1.296 の `claude -p`（メインのセッションとサブエージェントの両方）です．対話セッションでは確認していません．
 
 ## ローカル専用で導入する（リポジトリにファイルを残さない）
 
