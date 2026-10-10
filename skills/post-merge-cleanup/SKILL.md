@@ -1,6 +1,6 @@
 ---
 name: post-merge-cleanup
-description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the default branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge), runs the verify command, and safely deletes the now-merged feature branch (local delete after ancestor check, remote via fetch --prune only). Never merges PRs, closes issues, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
+description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the default branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks that the PR's base branch matches default_branch in .claude/ai-loop.json (stops if not), checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge; if the PR was merged into a branch other than GitHub's default branch, closing keywords do not auto-close the Issue, so it reports that the user closes it on the GitHub Web), runs the verify command, and safely deletes the now-merged feature branch (local delete after ancestor check, remote via fetch --prune only). Never merges PRs, closes issues, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
 ---
 
 # Post-Merge Cleanup
@@ -40,11 +40,12 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 2. **マージ結果の確認**（推測せず`gh api`出力で確認する原則）
 ```
    git log -3 --format=%h
-   gh api repos/<repo>/pulls/<PR番号> --jq '{number, state, merged_at, merge_commit_sha, head_ref: .head.ref}'
+   gh api repos/<repo>/pulls/<PR番号> --jq '{number, state, merged_at, merge_commit_sha, head_ref: .head.ref, base_ref: .base.ref}'
 ```
    `merged_at` が null でないことを出力で確認する（null なら未マージ）．
    未マージならここで停止し，状況を報告する．
    `head_ref` を手順5の対象ブランチ名として使う．
+   `base_ref` を `.claude/ai-loop.json` の `default_branch` と照合する．違えばここで停止し，状況を報告する．
 
 3. **対応Issueの状態確認**（Fixes/Closesキーワードの入れ忘れ対策。PRマージ後も
    IssueがOPENのまま残ることがあるため。失敗記録の対象外
@@ -54,12 +55,20 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 ```
    本文から，閉じるキーワード（Closes・Fixes・Resolves とその活用形．大文字小文字を区別しない）の直後の `#N` の番号だけを取り出して出力する．キーワードのない番号（過去の Issue・PR への言及）は取り出さない．
    呼び出し時に対応 Issue の番号が指定された場合は，その番号を使い，抽出した番号に含まれるかを報告する．
+   続けて，GitHub の既定ブランチを取得する．
+```
+   gh api repos/<repo> --jq .default_branch
+```
    - **番号が指定された場合，または指定がなく1件だけ見つかった場合**:
      `gh api repos/<repo>/issues/<N> --jq '{state, state_reason}'`
      で `state` が `open` のままでも，クローズのコマンド案は提示しない．
-     `Closes #N` による自動クローズはマージから遅れて反映されることがあるため，
-     open のままである旨だけを報告し，時間をおいて再確認するよう案内する
-     （`gh issue close` は `.claude/settings.json` または `.claude/settings.local.json` の deny 対象）．
+     - 手順2の `base_ref` が GitHub の既定ブランチと同じ場合：
+       `Closes #N` による自動クローズはマージから遅れて反映されることがあるため，
+       open のままである旨だけを報告し，時間をおいて再確認するよう案内する
+       （`gh issue close` は `.claude/settings.json` または `.claude/settings.local.json` の deny 対象）．
+     - 違う場合：閉じるキーワードによる自動クローズは働かない．open なら，
+       「自動クローズの対象外（既定ブランチ以外へのマージ）．ユーザが GitHub の Web で閉じる」と報告する．
+       時間をおいて再確認する案内はしない．
    - **番号の指定がなく，抽出した番号が0件，または異なる複数の番号だった場合**: 自動判定は行わず，
      「対応Issueを特定できなかった」旨を報告するに留める（無関係なIssueを
      誤ってクローズ候補として提示しないため）．
@@ -111,7 +120,7 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 ## このスキルが行わないこと（常に停止して人間の指示を待つ）
 
 - PRのマージ・クローズ・コメント追加
-- Issueのクローズ実行とコマンド案の提示（自動クローズの反映を待つ．deny対象でもある）
+- Issueのクローズ実行とコマンド案の提示（自動クローズの反映を待つ．既定ブランチ以外へのマージではユーザが GitHub の Web で閉じる．deny対象でもある）
 - リモートブランチの明示的削除（`push origin --delete`）
 - 新しいブランチの作成
 - 次のIssue／タスクへの着手

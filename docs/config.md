@@ -7,7 +7,7 @@ ai-loop のスキル・エージェントは，使う側のリポジトリの `.
 | 項目 | 型 | 内容 | 使うスキル・エージェント |
 |---|---|---|---|
 | `repo` | 文字列 | `所有者/リポジトリ名`．gh api のパスに使う | publish-github・post-merge-cleanup・commander・implementer |
-| `default_branch` | 文字列 | 既定ブランチ名 | pre-push-check・post-merge-cleanup・commander・implementer |
+| `default_branch` | 文字列 | 既定ブランチ名．PR を向けるブランチ．GitHub の既定ブランチと違ってよい（その場合，閉じるキーワードで Issue は自動で閉じない．post-merge-cleanup がそのことを報告する） | pre-push-check・post-merge-cleanup・commander・implementer |
 | `python` | 文字列 | Python の実行ファイル（例 `.venv/bin/python`） | なし（今は使うスキルがない．予約） |
 | `verify.command` | 文字列 | 検証コマンド | pre-push-check・post-merge-cleanup・diagnose-failure・commander・implementer |
 | `verify.pass_marker` | 文字列 | 成功を示す出力の目印 | pre-push-check・diagnose-failure |
