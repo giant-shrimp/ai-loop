@@ -41,25 +41,34 @@ python3 <プラグインのパス>/bin/ai_loop_init.py --mode {normal,local}
 
 init は，前提（リポジトリのルートで実行している・`gh repo view` が成功する・origin の URL の末尾が `<repo>` または `<repo>.git` と一致する・既定ブランチが決まる・`local` のとき `.claude/` の下に追跡済みのファイルがない）の検査が NG なら，何も書かずに終了コード 2 で終わる．既存のファイルは上書きせず SKIPPED と出す．既存の settings では，足りないもの（`attribution` と deny の各行）を一覧で出すので，人が足す．コミット・push・PR の作成はしない．
 
-init が作る `.claude/ai-loop.json` は次の形である．`repo` と `default_branch` は `gh repo view` から取る．
+init が作る `.claude/ai-loop.json` は次の形である（例の値は `example-owner/example-repo` と `main`）．`repo` と `default_branch` は `gh repo view` から取る．
 
 ```json
 {
-  "repo": "<所有者/リポジトリ名>",
-  "default_branch": "<既定ブランチ>",
+  "repo": "example-owner/example-repo",
+  "default_branch": "main",
   "python": "python3",
   "verify": {
     "command": "bash .claude/ai-loop/verify.sh",
     "pass_marker": "VERIFY PASSED",
     "fail_marker": "VERIFY FAILED",
-    "summary_markers": [" failed", "VERIFY "],
+    "summary_markers": [
+      " failed",
+      "VERIFY "
+    ],
     "deny": true
   },
   "scanners": [
-    {"name": "個人情報走査", "command": "check_no_personal_info.py", "added_lines_only": false}
+    {
+      "name": "個人情報走査",
+      "command": "check_no_personal_info.py",
+      "added_lines_only": false
+    }
   ],
   "extra_checks": [],
-  "report": {"show_titles": false},
+  "report": {
+    "show_titles": false
+  },
   "records": {
     "errors": ".claude/ai-loop/ERRORS.md",
     "errors_inventory": ".claude/ai-loop/errors_inventory.md",
@@ -169,7 +178,7 @@ bin の `check_review_comment.sh`・`select_review_comment.sh` は，claude-code
 
 ## 7. 1件目の Issue を通す
 
-1. 1〜4 節のファイルを置き，既定ブランチに入れる．
+1. 1〜4 節の手順で init を実行してファイルを作る（`--dry-run` の出力を確かめてから実行する）．通常の導入では，作ったファイルをブランチでコミットして PR を作り，マージして既定ブランチに入れる．ローカル専用の導入では，コミットしない．
 2. リポジトリのルートで `python3 <プラグインのパス>/bin/ai_loop_doctor.py` を実行し，全項目 OK・終了コード 0 を確かめる．プラグインのパスは `claude plugin list --json` の `installPath` で分かる．doctor は設定・gh の認証・リモート・records・settings・除外を確かめ，検証コマンドも実行する（終了コード 0・`pass_marker`・要約の行）．NG の項目には直し方が出る．ローカル専用で導入した場合は，`--mode local` を付けると除外の確認を必ず行う．
 3. 使う側のリポジトリで `claude --model opus` を起動し，`/ai-loop:commander` と入力して，案を伝える．
 4. 司令塔が Issue の一覧と本文の案を示す．承認すると，司令塔が Issue を作る．
@@ -180,8 +189,10 @@ bin の `check_review_comment.sh`・`select_review_comment.sh` は，claude-code
 
 ## ローカル専用で導入する場合
 
-ai-loop の設定・検証コマンド・記録をコミットしない導入では，次の点だけが違う．手順は README の「ローカル専用で導入する」の節を参照．
+ai-loop の設定・検証コマンド・記録をコミットしない導入では，init に `--mode local` を付ける．通常の導入との違いは次のとおり（README の「ローカル専用で導入する」の節も参照）．
 
-- 置き場所：ファイルは上と同じく `.claude/` の下に置き，`.git/info/exclude` に `/.claude/` を足して除外する
-- settings：3 節の内容を `.claude/settings.local.json` に書く．deny の `.claude/settings.json` の2行は `.claude/settings.local.json` にする
-- 除外の確認：`git status --porcelain --ignored` に `!! .claude/` が出て，`git check-ignore -v .claude/ai-loop.json` が `.git/info/exclude` の行を示すことを確かめる
+- 置き場所：init は上と同じく `.claude/` の下にファイルを作り，`.git/info/exclude` に `/.claude/` の1行を足して除外する（同じ行があれば足さない）
+- settings：init は 3 節の内容を `.claude/settings.local.json` に書く．deny の `.claude/settings.json` の2行は `.claude/settings.local.json` になる
+- 前提：`.claude/` の下に追跡済みのファイルがあると除外が効かないので，init は何も書かずに終了コード 2 で止まる
+- 既定ブランチへの反映：しない．doctor の D15 は対象外になる
+- 除外の確認：`python3 <プラグインのパス>/bin/ai_loop_doctor.py --mode local` の D14 で確かめる（`.git/info/exclude` の行・`git check-ignore -v .claude/ai-loop.json` が `.git/info/exclude` を示すこと・`.claude/` の下に追跡済みのファイルがないこと）

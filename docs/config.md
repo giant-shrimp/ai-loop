@@ -24,29 +24,43 @@ ai-loop のスキル・エージェントは，使う側のリポジトリの `.
 
 ## 例
 
+init（`bin/ai_loop_init.py`）が作る `.claude/ai-loop.json` の例（例の値は `example-owner/example-repo` と `main`）．README・[setup.md](setup.md) の例と同じである．
+
 ```json
 {
   "repo": "example-owner/example-repo",
   "default_branch": "main",
-  "python": ".venv/bin/python",
+  "python": "python3",
   "verify": {
-    "command": "./scripts/verify.sh",
+    "command": "bash .claude/ai-loop/verify.sh",
     "pass_marker": "VERIFY PASSED",
     "fail_marker": "VERIFY FAILED",
-    "summary_markers": [" passed", " failed", "VERIFY "],
+    "summary_markers": [
+      " failed",
+      "VERIFY "
+    ],
     "deny": true
   },
   "scanners": [
-    {"name": "走査器", "command": "check_no_personal_info.py", "added_lines_only": false}
+    {
+      "name": "個人情報走査",
+      "command": "check_no_personal_info.py",
+      "added_lines_only": false
+    }
   ],
   "extra_checks": [],
+  "report": {
+    "show_titles": false
+  },
   "records": {
-    "errors": "ERRORS.md",
-    "errors_inventory": "docs/errors_md_inventory.md",
-    "decisions": "docs/decisions/",
-    "trials": "docs/ai_loop_state/"
+    "errors": ".claude/ai-loop/ERRORS.md",
+    "errors_inventory": ".claude/ai-loop/errors_inventory.md",
+    "decisions": ".claude/ai-loop/decisions/",
+    "trials": ".claude/ai-loop/trials/"
   }
 }
 ```
+
+init が作らない任意の項目（`one_tool_guard`・`extra_checks` の要素など）は，上の表を見て人が足す．`verify.command`・`records`・`python` は，リポジトリに合わせて別の値にしてもよい（例：`"python": ".venv/bin/python"`，`"command": "./scripts/verify.sh"`，`"errors": "ERRORS.md"`）．その場合も，setup.md の 2 節の条件と 4 節の置き場所を満たす．
 
 `check_no_personal_info.py` はこのプラグインの `bin/` にあり，Bash の PATH に載る．`--diff-base` の形に対応している．
