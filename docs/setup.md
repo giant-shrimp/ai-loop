@@ -4,30 +4,62 @@ ai-loop を使う側のリポジトリを整え，1件目の Issue を PR のマ
 
 この文書は，置くファイルを `.claude/` の下にまとめ，設定を `.claude/settings.json` に書いてコミットする通常の導入を主に書く．リポジトリにファイルを残さない導入は，末尾の「ローカル専用で導入する場合」を参照．
 
-## 1. 置くファイル
+## 1. 置くファイルと init スクリプト
 
-| ファイル | 必須か | 内容 |
-|---|---|---|
-| `.claude/ai-loop.json` | 必須 | 設定．項目は [config.md](config.md) を参照 |
-| `.claude/ai-loop/verify.sh` | 必須 | 検証コマンド（2 節） |
-| `.claude/settings.json` | 勧める | 権限の deny・ask と `attribution`（3 節） |
-| `.claude/ai-loop/ERRORS.md` など | 必須 | records の置き場所（4 節） |
-| `CLAUDE.md` | 任意 | 司令塔と実装役が従う手順・読む文書（5 節） |
-| CI と review のワークフロー | 任意 | 6 節 |
+| ファイル | 必須か | 内容 | init が作るか |
+|---|---|---|---|
+| `.claude/ai-loop.json` | 必須 | 設定．項目は [config.md](config.md) を参照 | 作る |
+| `.claude/ai-loop/verify.sh` | 必須 | 検証コマンド（2 節） | 作る |
+| `.claude/settings.json` | 勧める | 権限の deny・ask と `attribution`（3 節） | 作る |
+| `.claude/ai-loop/ERRORS.md` など | 必須 | records の置き場所（4 節） | 作る |
+| `CLAUDE.md` | 任意 | 司令塔と実装役が従う手順・読む文書（5 節） | 作らない |
+| CI と review のワークフロー | 任意 | 6 節 | 作らない |
 
-これらのファイルは人が作り，既定ブランチに入れる．`.claude/ai-loop.json`・検証コマンド・settings は deny の対象にするので，Claude Code には編集させない．
+これらのファイルのうち init が作るものは，init スクリプト（`bin/ai_loop_init.py`）が作り，人が内容を承認する（`--dry-run` の出力を確かめる）．通常の導入では，その後に既定ブランチに入れる．`.claude/ai-loop.json`・検証コマンド・settings は deny の対象にするので，作った後は Claude Code に編集させない．
 
-`.claude/ai-loop.json` の `verify.command` と `records` は，次のようにこの文書の置き場所を指す．
+init は，使う側のリポジトリのルートで実行する．プラグインのパスは `claude plugin list --json` の `installPath` で分かる．
+
+```text
+python3 <プラグインのパス>/bin/ai_loop_init.py --mode {normal,local}
+    (--test-command "<コマンド>" | --no-tests)
+    [--default-branch <名前>] [--show-titles]
+    [--deny-secret <パス> ...] [--dry-run]
+```
+
+- `--mode`：`normal` は settings を `.claude/settings.json` に書く（コミットする）．`local` は `.claude/settings.local.json` に書き，`.git/info/exclude` に `/.claude/` を足す（末尾の「ローカル専用で導入する場合」）
+- `--test-command`・`--no-tests`：検証コマンドの中身（2 節）
+- `--default-branch`：GitHub の既定ブランチと違うブランチに PR を向ける場合や，コミットが0件で既定ブランチを取得できない場合に指定する
+- `--show-titles`：`report.show_titles` を true にする
+- `--deny-secret`：秘密のファイル（`.env` など）を deny に足す（3 節）
+- `--dry-run`：何も書かず，作るファイルの全文を出す
+
+手順は次のとおり．
+
+1. `--dry-run` を付けて実行し，出力（作るファイルの全文）を人が確かめて承認する．
+2. 同じ引数で `--dry-run` を外して実行する．
+3. `python3 <プラグインのパス>/bin/ai_loop_doctor.py` で診断する（7 節の手順2）．
+
+init は，前提（リポジトリのルートで実行している・`gh repo view` が成功する・origin の URL の末尾が `<repo>` または `<repo>.git` と一致する・既定ブランチが決まる・`local` のとき `.claude/` の下に追跡済みのファイルがない）の検査が NG なら，何も書かずに終了コード 2 で終わる．既存のファイルは上書きせず SKIPPED と出す．既存の settings では，足りないもの（`attribution` と deny の各行）を一覧で出すので，人が足す．コミット・push・PR の作成はしない．
+
+init が作る `.claude/ai-loop.json` は次の形である．`repo` と `default_branch` は `gh repo view` から取る．
 
 ```json
 {
+  "repo": "<所有者/リポジトリ名>",
+  "default_branch": "<既定ブランチ>",
+  "python": "python3",
   "verify": {
     "command": "bash .claude/ai-loop/verify.sh",
     "pass_marker": "VERIFY PASSED",
     "fail_marker": "VERIFY FAILED",
-    "summary_markers": [" passed", " failed", "VERIFY "],
+    "summary_markers": [" failed", "VERIFY "],
     "deny": true
   },
+  "scanners": [
+    {"name": "個人情報走査", "command": "check_no_personal_info.py", "added_lines_only": false}
+  ],
+  "extra_checks": [],
+  "report": {"show_titles": false},
   "records": {
     "errors": ".claude/ai-loop/ERRORS.md",
     "errors_inventory": ".claude/ai-loop/errors_inventory.md",
@@ -36,8 +68,6 @@ ai-loop を使う側のリポジトリを整え，1件目の Issue を PR のマ
   }
 }
 ```
-
-ほかの項目（`repo`・`default_branch`・`scanners` など）は config.md の例に従う．
 
 `.claude/ai-loop.json` を置くと，このプラグインのフックが，1回の応答で2つ以上のツール呼び出しを止める．無効にするには `"one_tool_guard": false` を足す（[config.md](config.md)）．確認した版は Claude Code 2.1.296 で，`claude -p` と対話セッションの両方で確かめている．
 
@@ -49,26 +79,34 @@ ai-loop を使う側のリポジトリを整え，1件目の Issue を PR のマ
 - 失敗したときは 0 以外で終わり，出力に `verify.fail_marker` を含める
 - 結果の要約の行（テストの件数や失敗の件数など）を，`verify.summary_markers` のどれかを含む形で出力する．diagnose-failure と post-merge-cleanup は，この目印で要約の行を取り出す
 - 追跡済みのファイルを変えない．diagnose-failure は手元で検証コマンドを実行し，pre-push-check は直前の結果を使い回すことがあるため
+- カレントディレクトリ（または `git rev-parse --show-toplevel`）のリポジトリを検査する．スクリプト自身の置き場所（`$0` など）を基準にしない．司令塔は CI のない PR を worktree で検証するため
 
-最小の例（`<テストのコマンド>` はリポジトリのテストに置き換える）：
+init は `--test-command` のとき，次の検証コマンドを作る（`<テストのコマンド>` に引数の値が入る）．
 
 ```bash
 #!/usr/bin/env bash
-# リポジトリのテストを実行し，結果に応じて目印を出す
-if <テストのコマンド>; then
+# ai-loop の検証コマンド（ai_loop_init.py が生成）
+# カレントディレクトリのリポジトリを検査する（$0 を基準にしない．commander の worktree での検証のため）
+cd "$(git rev-parse --show-toplevel)" || { echo "verify: not a git repository, 1 failed"; echo "VERIFY FAILED"; exit 1; }
+if {
+  <テストのコマンド>
+}; then
+  echo "verify: test command exit 0, 0 failed"
   echo "VERIFY PASSED"; exit 0
 else
+  rc=$?
+  echo "verify: test command exit $rc, 1 failed"
   echo "VERIFY FAILED"; exit 1
 fi
 ```
 
-テストのコマンドが件数の行（例：`3 passed`・`1 failed`）を出さない場合は，`summary_markers` に合う要約の行を検証コマンドが自分で出す．
+テストのないリポジトリでは `--no-tests` を使う．init は，追跡済みの `*.py`・`*.sh`・`*.json` の構文だけを検査する検証コマンドを作り，完了時に「1件目の案としてテストの追加を勧める」と出す．検証コマンドは `verify: no tests; syntax checks only` の行を必ず出すので，テストがないことが司令塔の報告と post-merge-cleanup の要約に残る．何も検査しない検証コマンド（常に合格）は作らない．
 
-`verify.deny` を true にした場合，検証コマンドとゲート値の変更は人が行う．検証コマンドを 3 節の deny に入れる．
+`verify.deny` を true にした場合，検証コマンドとゲート値の変更は人が行う．init は検証コマンドを 3 節の deny に入れる．
 
 ## 3. settings の deny・ask・attribution
 
-`.claude/settings.json` の例．`main` は `default_branch` の値に置き換える．
+init が作る settings は次の形である（`main` は既定ブランチに置き換わる）．`--mode local` では `.claude/settings.local.json` に書き，deny の `.claude/settings.json` の2行は `.claude/settings.local.json` になる．
 
 ```json
 {
@@ -96,20 +134,14 @@ fi
 
 - `attribution`：空にすると，コミットと PR に帰属行が付かない．実装役はコミットのトレーラや PR 本文の帰属フッタを付けない
 - `deny`：ai-loop で人が行う操作を入れる．マージ，Issue のクローズ，既定ブランチへの push，force push，検証コマンドと設定ファイルの編集である．deny の対象のファイルは，司令塔も実装役も編集しない．変えるときは commander の 4 節の方式（人が GitHub の Web で編集する）で進める
-- 秘密のファイル（`.env` など）：`Read(./.env)`・`Edit(./.env)` を deny に入れる．Read の deny は Bash のコマンド（`cat .env` など）までは防げないので，指示の決まり（CLAUDE.md など）にも「読まない・開かない・変えない（コマンドも含む）」と書く
-- `ask`：変更のたびに人が承認したいファイルを入れる．進め方は commander の 4 節に従う
+- 秘密のファイル（`.env` など）：init に `--deny-secret .env` を付けると，`Read(./.env)`・`Edit(./.env)` を deny に入れる．Read の deny は Bash のコマンド（`cat .env` など）までは防げないので，指示の決まり（CLAUDE.md など）にも「読まない・開かない・変えない（コマンドも含む）」と書く
+- `ask`：変更のたびに人が承認したいファイルを入れる．init は空で作る．進め方は commander の 4 節に従う
+
+settings が既にある場合，init は上書きせず，足りないもの（`attribution` と deny の各行）を一覧で出す．人がその一覧を見て足す．
 
 ## 4. records の初期状態
 
-`records` の4つの置き場所は，導入時に空で作っておく．
-
-```text
-mkdir -p .claude/ai-loop/decisions .claude/ai-loop/trials
-touch .claude/ai-loop/ERRORS.md .claude/ai-loop/errors_inventory.md
-touch .claude/ai-loop/decisions/.keep .claude/ai-loop/trials/.keep
-```
-
-ディレクトリは，git が空のディレクトリを記録しないため `.keep` を置く．
+`records` の4つの置き場所は，init が空で作る（`.claude/ai-loop/ERRORS.md`・`.claude/ai-loop/errors_inventory.md`・`.claude/ai-loop/decisions/.keep`・`.claude/ai-loop/trials/.keep`）．ディレクトリは，git が空のディレクトリを記録しないため `.keep` を置く．
 
 - `errors`（失敗記録）：司令塔が Issue を作るときと，diagnose-failure が関連する記録を探すときに grep で読む．空でよい
 - `errors_inventory`（失敗記録の棚卸し）：diagnose-failure が読む．空でよい
