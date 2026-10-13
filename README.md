@@ -26,6 +26,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 | エージェント | `investigator` | 材料を列挙する調査役（読み取り専用） |
 | エージェント | `auditor` | 報告や変更を記載規則に照らす監査役（読み取り専用） |
 | bin | `check_no_personal_info.py` | 個人情報・絶対パスの走査器 |
+| bin | `ai_loop_doctor.py` | 使う側のリポジトリの導入状態の診断（項目ごとに OK／NG と直し方を出し，終了コードで合否を示す） |
 | bin | `check_review_comment.sh`・`select_review_comment.sh` | review のコメントの特定と判定の補助 |
 | フック | `hooks/hooks.json`・`bin/one_tool_guard.py` | 1回の応答で2つ以上のツール呼び出しを止める |
 

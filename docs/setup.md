@@ -138,7 +138,7 @@ bin の `check_review_comment.sh`・`select_review_comment.sh` は，claude-code
 ## 7. 1件目の Issue を通す
 
 1. 1〜4 節のファイルを置き，既定ブランチに入れる．
-2. `bash .claude/ai-loop/verify.sh` を実行し，終了コード 0 と `VERIFY PASSED` を確かめる．
+2. リポジトリのルートで `python3 <プラグインのパス>/bin/ai_loop_doctor.py` を実行し，全項目 OK・終了コード 0 を確かめる．プラグインのパスは `claude plugin list --json` の `installPath` で分かる．doctor は設定・gh の認証・リモート・records・settings・除外を確かめ，検証コマンドも実行する（終了コード 0・`pass_marker`・要約の行）．NG の項目には直し方が出る．ローカル専用で導入した場合は，`--mode local` を付けると除外の確認を必ず行う．
 3. 使う側のリポジトリで `claude --model opus` を起動し，`/ai-loop:commander` と入力して，案を伝える．
 4. 司令塔が Issue の一覧と本文の案を示す．承認すると，司令塔が Issue を作る．
 5. 司令塔が実装役を起動する．実装役はブランチ作成・実装・検証・pre-push-check・push・PR 作成までを行う．
