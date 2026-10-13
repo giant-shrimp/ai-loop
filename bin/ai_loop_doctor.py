@@ -107,6 +107,14 @@ def check_config(config):
     return bad
 
 
+def origin_matches(url, repo):
+    """URL の末尾が <repo> または <repo>.git と一致するか（前は / か : で区切られていること）．"""
+    url = url.strip().rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+    return url == repo or url.endswith("/" + repo) or url.endswith(":" + repo)
+
+
 def sanitize(line, top):
     line = line.replace(top, ".")
     home = os.path.expanduser("~")
@@ -196,7 +204,7 @@ def diagnose(top, args):
         code, out = run(["git", "remote", "get-url", "origin"], cwd=top)
         if code != 0:
             r.put("NG", "D06", "origin がない", ["git remote add origin で repo のリモートを足す"])
-        elif repo in out:
+        elif origin_matches(out, repo):
             r.put("OK", "D06", "origin が repo を指す")
         else:
             r.put("NG", "D06", "origin が repo を指していない",
@@ -409,6 +417,8 @@ def main():
     parser.add_argument("--verify-timeout", type=int, default=600)
     parser.add_argument("--skip-verify", action="store_true")
     args = parser.parse_args()
+    # origin に接続できないとき，git が認証を求めて止まらないようにする
+    os.environ["GIT_TERMINAL_PROMPT"] = "0"
     try:
         code, out = run(["git", "rev-parse", "--show-toplevel"])
         if code != 0:
