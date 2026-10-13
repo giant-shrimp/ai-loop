@@ -39,10 +39,10 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 - NG があれば，`直し方:` に従う．直し方がユーザ操作（push・マージ・settings の編集など）なら，ユーザに依頼する．`.claude/ai-loop.json`・検証コマンド・settings を Edit・Write で直さない（deny の対象）
 - 通常導入では，作ったファイルが既定ブランチに入るまで D15 が NG になる．ブランチ `ai-loop-setup` を作り，init が作ったファイルを1つずつ `git add` してコミットし（帰属行を付けない），push して PR を作り，ユーザにマージを依頼する．マージ後に `git fetch origin` を実行してから doctor をもう一度実行する
 - コミットが0件のリポジトリでは D07 が NG になる．ユーザに最初のコミットと push を依頼する（例：`! git commit --allow-empty -m "initial commit"` と `! git push -u origin <既定ブランチ>`．通常導入では，最初のコミットに init が作ったファイルを入れてよい）
-- 完了条件：終了コード 0（`結果: OK 16件 / NG 0件`）
+- 完了条件：終了コード 0（`NG 0件`）
 
 **S7. スキルを読み込む**．ユーザに `/reload-plugins` の実行を依頼する（ユーザ操作）．
-- 完了条件：ユーザが実行したと答えた後，S6 と同じ doctor のコマンドが終了コード 0
+- 完了条件：ユーザが実行したと答えた後，S6 と同じ doctor のコマンドが終了コード 0（`NG 0件`）
 
 完了したら，ユーザに次を伝える．
 - 使い方：使う側のリポジトリで `claude --model opus` を起動し，`/ai-loop:commander` と入力して案を伝える
