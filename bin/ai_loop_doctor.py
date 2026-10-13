@@ -220,8 +220,12 @@ def diagnose(top, args):
             r.put("OK", "D07", "origin に既定ブランチ %s がある" % branch)
             branch_ok = True
         else:
-            r.put("NG", "D07", "origin に既定ブランチ %s がない（または origin に接続できない）" % branch,
-                  ["コミットが0件なら，最初のコミットを作り，ユーザが `! git push -u origin %s` を実行する" % branch])
+            fixes = []
+            current = run(["git", "branch", "--show-current"], cwd=top)[1].strip()
+            if current and current != branch:
+                fixes.append("コミットが0件なら，手元のブランチ %s を `git checkout -b %s` で既定ブランチにそろえる" % (current, branch))
+            fixes.append("コミットが0件なら，最初のコミットを作り，ユーザが `! git push -u origin %s` を実行する" % branch)
+            r.put("NG", "D07", "origin に既定ブランチ %s がない（または origin に接続できない）" % branch, fixes)
 
     # D08
     if not config_ok:
