@@ -10,6 +10,11 @@
     1. ホームディレクトリを指す絶対パスの接頭辞（`HOME_PREFIX_PATTERN`）
     2. メールアドレスの形（ローカル部・区切り記号・ドメイン部、`EMAIL_PATTERN`）
     3. 日本語の敬称（`HONORIFIC_PATTERN`）
+    4. 実行環境の OS のユーザ名（`OS_USER_PATTERN`）。実行時に
+       `getpass.getuser()`・`$HOME` の末尾・`$USER`・`$LOGNAME` から集める。
+       3文字未満と一般的な名前（`COMMON_USER_NAMES`）は除き、名前が0件なら
+       この検出は足さない。ヒットした行は内容を出さず、ラベル `[os-user]` に
+       置き換えて出す（ユーザ名そのものを出力に残さない）
 
 誤検出の抑止:
     1. 敬称を表す一字が複合語（「仕様」「同様」など）の末尾字に一致すること
@@ -38,7 +43,8 @@
         使用法を表示する（終了コード 0）。
 
     ヒットした行は `ファイル名:行番号:行の内容` の形式で標準出力へ出す
-    （ディレクトリ名は含めない）。異なる入力パスが同じファイル名を
+    （ディレクトリ名は含めない）。OS のユーザ名にヒットした行に限り、
+    行の内容の代わりに `[os-user]` を出す。異なる入力パスが同じファイル名を
     持つ場合に限り、`ファイル名#N`（N は入力順の1始まり番号）で区別する。
     （`--diff-base` モードはこの限りでない。上記参照）
 
@@ -52,6 +58,7 @@
 検証コマンド・CI・フックへの組み込みは、使う側のリポジトリで行う。
 """
 import argparse
+import getpass
 import os
 import re
 import subprocess
@@ -98,13 +105,52 @@ HONORIFIC_EXCLUDE_PATTERN = re.compile(
     r"|宮殿|御殿|殿堂|沈殿|神殿|仏殿"
 )
 
+# 4. OS のユーザ名。CI・コンテナなどでよく使われる一般的な名前は、本文中の
+#    普通の語と区別できないため検出しない。
+COMMON_USER_NAMES = frozenset(
+    {"root", "runner", "user", "ubuntu", "node", "vscode", "codespace"}
+)
+
+
+def os_user_names():
+    """実行環境の OS のユーザ名の候補を集める（3文字未満・一般的な名前は除く）。"""
+    names = set()
+    try:
+        names.add(getpass.getuser())
+    except (KeyError, OSError):
+        pass  # 環境変数にも passwd にも名前が無い
+    home = os.environ.get("HOME")
+    if home:
+        names.add(os.path.basename(os.path.normpath(home)))
+    for var in ("USER", "LOGNAME"):
+        value = os.environ.get(var)
+        if value:
+            names.add(value)
+    return sorted(n for n in names if len(n) >= 3 and n not in COMMON_USER_NAMES)
+
+
+def build_os_user_pattern(names):
+    """名前の前後が英数字でないときだけ一致するパターン。名前が0件なら None。
+
+    前後が `-`・`_` のとき（`-home-<名前>-` など）は一致に含める。
+    大文字と小文字は区別する。
+    """
+    if not names:
+        return None
+    alternatives = "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+    return re.compile(r"(?<![A-Za-z0-9])(?:%s)(?![A-Za-z0-9])" % alternatives)
+
+
+OS_USER_PATTERN = build_os_user_pattern(os_user_names())
+
 # 名前とパターンの対応。走査本体と、テストのミューテーション網羅確認で使う。
 # honorific は検出時に HONORIFIC_EXCLUDE_PATTERN も参照する（_honorific_hit）。
+# os-user は名前が0件のとき足さない。
 DETECTION_PATTERNS = (
     ("home-path", HOME_PREFIX_PATTERN),
     ("email", EMAIL_PATTERN),
     ("honorific", HONORIFIC_PATTERN),
-)
+) + ((("os-user", OS_USER_PATTERN),) if OS_USER_PATTERN else ())
 
 # --- 誤検出の抑止パターン（検出ではなく除外に使う）-------------------------------
 
@@ -127,8 +173,12 @@ def _honorific_hit(line):
     return False
 
 
+def _os_user_hit(line):
+    return bool(OS_USER_PATTERN and OS_USER_PATTERN.search(line))
+
+
 def _line_has_hit(line):
-    """1行に検出パターン（home-path/email/honorific）のいずれかが一致するか。
+    """1行に検出パターン（home-path/email/honorific/os-user）のいずれかが一致するか。
 
     `iter_hits`（ファイル・標準入力の走査）と `iter_diff_hits`（
     差分の追加行のみの走査）が共用する。1行判定の挙動はどちらの経路でも
@@ -138,7 +188,13 @@ def _line_has_hit(line):
         HOME_PREFIX_PATTERN.search(line)
         or EMAIL_PATTERN.search(line)
         or _honorific_hit(line)
+        or _os_user_hit(line)
     )
+
+
+def _hit_text(line):
+    """出力する行の内容。OS のユーザ名を含む行はラベルに置き換える。"""
+    return "[os-user]" if _os_user_hit(line) else line
 
 
 def iter_hits(path, lines):
@@ -148,7 +204,7 @@ def iter_hits(path, lines):
         if HUNK_HEADER_PATTERN.search(line):
             continue
         if _line_has_hit(line):
-            yield path, lineno, line
+            yield path, lineno, _hit_text(line)
 
 
 def scan_path(path):
@@ -209,7 +265,7 @@ def iter_diff_hits(diff_text):
                 continue  # ハンクヘッダより前に追加行相当の行が来ることは無いが安全側
             content = raw_line[1:]
             if _line_has_hit(content):
-                yield current_path, new_lineno, content
+                yield current_path, new_lineno, _hit_text(content)
             new_lineno += 1
         elif raw_line.startswith("-"):
             continue  # 削除行。新ファイル側に存在しないので行番号は進めない
