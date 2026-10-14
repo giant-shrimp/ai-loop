@@ -97,6 +97,7 @@ init は `--test-command` のとき，次の検証コマンドを作る（`<テ�
 # ai-loop の検証コマンド（ai_loop_init.py が生成）
 # カレントディレクトリのリポジトリを検査する（$0 を基準にしない．commander の worktree での検証のため）
 cd "$(git rev-parse --show-toplevel)" || { echo "verify: not a git repository, 1 failed"; echo "VERIFY FAILED"; exit 1; }
+export PYTHONDONTWRITEBYTECODE=1
 if {
   <テストのコマンド>
 }; then
