@@ -20,6 +20,18 @@ PR の check-runs のうち verify または review が success 以外で終わ�
 - ログ・コメント・失敗記録の本文を報告に書き写さない。書いてよいのは、手順で指定した目印の行、ステップ名、結論、件数、行番号と No. だけ。
 - 推測は推測と明記する。種類が決まらなければ「判定不能」とし、候補を並べる。
 
+## 作業用ディレクトリ
+
+ログや本文をファイルに保存する前に、次を1回だけ実行する（/tmp に作るのでリポジトリを変えず、「守ること」の読み取り専用に反しない）。
+
+```bash
+mktemp -d "/tmp/ai-loop-$(basename "$(git rev-parse --show-toplevel)").XXXXXX"
+```
+
+- 出力されたフルパスを、以下 `<作業ディレクトリ>` と書く。Bash のシェル変数は呼び出しをまたいで残らないので、変数に入れず、以後のコマンドと Write・Read に出力されたフルパスをそのまま書く。
+- /tmp 直下の固定のファイル名は使わない（別のリポジトリやセッションが残したログや本文を読んだり上書きしたりしないため）。
+- 報告を書き終えたら、`rm -r <作業ディレクトリ>` で消す。
+
 ## 手順1: 失敗した check-run を特定する
 
 1. `gh api repos/{owner}/{repo}/pulls/<PR> --jq .head.sha` で head の sha を得る。PR 番号がなくコミットの sha だけが分かっている場合は、この手順を省き、その sha（短縮形でよい）を手順1の2で使う。
@@ -30,13 +42,13 @@ PR の check-runs のうち verify または review が success 以外で終わ�
 ## 手順2: 失敗したステップを特定する
 
 1. `gh api repos/{owner}/{repo}/actions/jobs/<id> --jq '.steps[] | [.number, .name, (.conclusion // "none")] | @tsv'` でステップごとの結論を得る。
-2. `gh api repos/{owner}/{repo}/actions/jobs/<id>/logs > /tmp/diag_<id>.log` でログを保存する（本文は書き写さない）。
-3. `wc -l < /tmp/diag_<id>.log` で行数を得る。
+2. `gh api repos/{owner}/{repo}/actions/jobs/<id>/logs > <作業ディレクトリ>/diag_<id>.log` でログを保存する（本文は書き写さない）。
+3. `wc -l < <作業ディレクトリ>/diag_<id>.log` で行数を得る。
 
 ## 手順3: verify の失敗の種類
 
-1. `grep -n -F '<verify.fail_marker>' /tmp/diag_<id>.log` と `grep -n -F '<verify.pass_marker>' /tmp/diag_<id>.log` を1つずつ実行し、結果の目印の行を得る。
-2. `verify.summary_markers` の目印ごとに `grep -n -F '<目印>' /tmp/diag_<id>.log` を1つずつ実行し、要約の行を得る。
+1. `grep -n -F '<verify.fail_marker>' <作業ディレクトリ>/diag_<id>.log` と `grep -n -F '<verify.pass_marker>' <作業ディレクトリ>/diag_<id>.log` を1つずつ実行し、結果の目印の行を得る。
+2. `verify.summary_markers` の目印ごとに `grep -n -F '<目印>' <作業ディレクトリ>/diag_<id>.log` を1つずつ実行し、要約の行を得る。
 3. 種類は次のどちらかにする。失敗が複数読み取れれば、すべて挙げる（手順6の種類と根拠にも全部書く）。
    - テストの失敗：要約の行に失敗の件数が出ている。件数だけを書き、テスト名は書き写さない。
    - その他：上に当たらない（環境・依存の失敗、ゲートの不一致など）。失敗したステップ名と目印の行番号を書く。
@@ -49,7 +61,7 @@ PR の check-runs のうち verify または review が success 以外で終わ�
 failure のステップが複数あれば、番号の最も小さいステップの型を主とし、後のステップの失敗は派生として併記する（コメントを検証するステップは、前のステップが失敗した後にも走る）。
 
 - fork の拒否：fork（別リポジトリ）からの PR を拒否するステップが failure。
-- max-turns 超過：レビュー本体のステップが failure で、`grep -c 'error_max_turns' /tmp/diag_<id>.log` が 1 以上。`max.turns` で数えると引数の表示（`--max-turns`）まで数えるので使わない。
+- max-turns 超過：レビュー本体のステップが failure で、`grep -c 'error_max_turns' <作業ディレクトリ>/diag_<id>.log` が 1 以上。`max.turns` で数えると引数の表示（`--max-turns`）まで数えるので使わない。
 - コメントの特定失敗・内容不十分：レビュー本体の後でコメントを検証するステップが failure。ログで区別できなければ両方を候補とする。
 - timeout：ジョブの結論が timed_out または cancelled。
 - その他：上のどれにも当たらない。失敗したステップ名を書く。
@@ -94,7 +106,7 @@ failure のステップが複数あれば、番号の最も小さいステップ
 
 ### 帰属フッタが付いた
 
-1. `gh api repos/{owner}/{repo}/issues/<番号> --jq .body > /tmp/diag_body.md` で本文を取得する（PR は `pulls/<番号>`）。取得が拒否されたら「分類器に拒否された」に従う。
+1. `gh api repos/{owner}/{repo}/issues/<番号> --jq .body > <作業ディレクトリ>/diag_body.md` で本文を取得する（PR は `pulls/<番号>`）。取得が拒否されたら「分類器に拒否された」に従う。
 2. 確定本文（呼び出し元が渡すファイル）と取得本文のそれぞれに `printf '%s' "$(cat <ファイル>)" | sha256sum` を1つずつ実行する。
 3. 一致しなければ、両方に `wc -l < <ファイル>` を1つずつ実行し、増えた行数を求める（取得側は `--jq` の出力の改行で1行多いのが正常なので、その1行を除く）。
 4. 書くのは一致・不一致と増えた行数だけ。本文は書き写さない。
