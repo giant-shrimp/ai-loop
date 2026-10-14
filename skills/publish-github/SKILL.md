@@ -5,10 +5,22 @@ description: GitHub の Issue・PR を作成するときに使う．指示で確
 
 # Issue・PR の作成と確認
 
+## 作業用ディレクトリ
+
+最初に次を1回だけ実行する．
+
+```bash
+mktemp -d "/tmp/ai-loop-$(basename "$(git rev-parse --show-toplevel)").XXXXXX"
+```
+
+- 出力されたフルパスを，以下 `<作業ディレクトリ>` と書く．Bash のシェル変数は呼び出しをまたいで残らないので，変数に入れず，以後のコマンドと Write・Read に出力されたフルパスをそのまま書く．
+- /tmp 直下の固定のファイル名は使わない（別のリポジトリやセッションが残した本文を読んだり上書きしたりしないため）．
+- 作成と確認が済んだら，`rm -r <作業ディレクトリ>` で消す．途中で停止した場合は消さず，フルパスを報告に書く．
+
 ## 共通
 
 - タイトル・本文は指示で確定したものを使い，書き足さない．本文はまず
-  `/tmp/publish_body.md` に書く（末尾は改行1つ）．
+  `<作業ディレクトリ>/publish_body.md` に書く（末尾は改行1つ）．
 - 作成は，GitHub MCP の作成用ツールがあればそれを使う．なければ
   `gh api -X POST` で `repos/<repo>/` 以下のエンドポイント（REST）を使う．`<repo>` は
   `.claude/ai-loop.json` の `repo` の値（ファイルや項目がなければ止めて報告する）．
@@ -36,9 +48,9 @@ description: GitHub の Issue・PR を作成するときに使う．指示で確
 次の3行を，それぞれ単独のコマンドとして1行ずつ実行する（`<種別>` は `issues` か `pulls`）．
 
 ```bash
-gh api repos/<repo>/<種別>/<番号> --jq .body > /tmp/publish_got.md
-printf '%s' "$(cat /tmp/publish_body.md)" | sha256sum
-printf '%s' "$(cat /tmp/publish_got.md)" | sha256sum
+gh api repos/<repo>/<種別>/<番号> --jq .body > <作業ディレクトリ>/publish_got.md
+printf '%s' "$(cat <作業ディレクトリ>/publish_body.md)" | sha256sum
+printf '%s' "$(cat <作業ディレクトリ>/publish_got.md)" | sha256sum
 ```
 
 - 2つの照合値が同じなら一致とする．

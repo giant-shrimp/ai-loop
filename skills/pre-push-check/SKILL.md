@@ -19,6 +19,15 @@ description: コミットした後，push する前に使う．.claude/ai-loop.j
 - 合否は，Bash ツールの結果がエラー（`Exit code N`）として返ったかどうかで判断する．`; echo "exit=$?"` は付けない．
 - `grep -c` は一致が0件のとき終了コード1を返す．Bash ツールがこれをエラーとして返すかどうかに関わらず，件数の値で判断する．
 
+## 手順0: 作業用ディレクトリの作成
+
+```bash
+mktemp -d "/tmp/ai-loop-$(basename "$(git rev-parse --show-toplevel)").XXXXXX"
+```
+
+- 出力されたフルパスを，以下 `<作業ディレクトリ>` と書く．Bash のシェル変数は呼び出しをまたいで残らないので，変数に入れず，以後のコマンドと Write・Read に出力されたフルパスをそのまま書く．
+- /tmp 直下の固定のファイル名は使わない（別のリポジトリやセッションが残したファイルを読んだり上書きしたりしないため）．
+
 ## 手順1: 変更範囲とコミットの確認
 
 ```bash
@@ -33,8 +42,8 @@ git log origin/<default_branch>..HEAD --format=%B | grep -c -i -E 'co-authored-b
 ## 手順2: 追加行の書き出し
 
 ```bash
-git diff --no-color -U0 origin/<default_branch>...HEAD | grep '^+' | grep -v '^+++' | cut -c2- > /tmp/prepush_added.txt
-wc -l < /tmp/prepush_added.txt
+git diff --no-color -U0 origin/<default_branch>...HEAD | grep '^+' | grep -v '^+++' | cut -c2- > <作業ディレクトリ>/prepush_added.txt
+wc -l < <作業ディレクトリ>/prepush_added.txt
 ```
 
 ## 手順3: 検証の実行
@@ -43,7 +52,7 @@ wc -l < /tmp/prepush_added.txt
 
 1. `verify.command`
 2. `scanners` のうち `added_lines_only` が false の走査器：`command` の末尾に `--diff-base origin/<default_branch>` を付ける（bin の `check_no_personal_info.py` はこの形に対応している）
-3. `scanners` のうち `added_lines_only` が true の走査器：`command` の末尾に `/tmp/prepush_added.txt` を付ける
+3. `scanners` のうち `added_lines_only` が true の走査器：`command` の末尾に `<作業ディレクトリ>/prepush_added.txt` を付ける
 4. `extra_checks` のうち `when_changed` がないもの：`command`
 
 - `verify.command` は出力に `verify.pass_marker` があり，エラーとして返らないことを確認する．出力をパイプで `tail` などに渡さない（終了コードが失われる）．
@@ -58,7 +67,8 @@ wc -l < /tmp/prepush_added.txt
 ## 手順4: 判定
 
 - 1つでも失敗したら push しない．
-- 指示の範囲で直せるものは直してコミットし，手順1からやり直す．
+- 判定が済んだら，`rm -r <作業ディレクトリ>` で作業用ディレクトリを消す．
+- 指示の範囲で直せるものは直してコミットし，手順0からやり直す．
 - 直せないもの，または直すと指示の範囲を超えるものは，停止して事実だけを報告する．
 
 ## しないこと

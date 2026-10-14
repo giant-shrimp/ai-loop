@@ -14,21 +14,31 @@ description: 既存文書の一部（行範囲）を，指示で確定した新�
 - 以下の `<文書>`・`<開始>`・`<終了>` は指示の値，`<N>` は新本文の行数，
   `<E2>` は `<開始> + <N> - 1` を表す．
 
+## 手順0: 作業用ディレクトリの作成
+
+```bash
+mktemp -d "/tmp/ai-loop-$(basename "$(git rev-parse --show-toplevel)").XXXXXX"
+```
+
+- 出力されたフルパスを，以下 `<作業ディレクトリ>` と書く．Bash のシェル変数は呼び出しをまたいで残らないので，変数に入れず，以後のコマンドと Write・Read に出力されたフルパスをそのまま書く．
+- /tmp 直下の固定のファイル名は使わない（別のリポジトリやセッションが残したファイルを読んだり上書きしたりしないため）．
+- 手順5が済んだら，`rm -r <作業ディレクトリ>` で消す．途中で停止した場合は消さず，フルパスを報告に書く．
+
 ## 手順1: 現行部分の一致確認
 
-1. 指示の現行部分を `/tmp/replace_old.txt` に書く（行頭の空白を保つ．末尾は改行1つ）．
+1. 指示の現行部分を `<作業ディレクトリ>/replace_old.txt` に書く（行頭の空白を保つ．末尾は改行1つ）．
 2. 次を実行する．
 
 ```bash
-diff /tmp/replace_old.txt <(sed -n '<開始>,<終了>p' <文書>); echo "exit=$?"
+diff <作業ディレクトリ>/replace_old.txt <(sed -n '<開始>,<終了>p' <文書>); echo "exit=$?"
 ```
 
 3. exit が 0 でなければ，編集せずに停止して報告する．
 
 ## 手順2: 新本文の書き出し
 
-1. 指示の新本文を `/tmp/replace_new.txt` に書く（行頭の空白を保つ．末尾は改行1つ）．
-2. `wc -l /tmp/replace_new.txt` と `grep -c '^$' /tmp/replace_new.txt` を実行し，
+1. 指示の新本文を `<作業ディレクトリ>/replace_new.txt` に書く（行頭の空白を保つ．末尾は改行1つ）．
+2. `wc -l <作業ディレクトリ>/replace_new.txt` と `grep -c '^$' <作業ディレクトリ>/replace_new.txt` を実行し，
    指示の行数・空行数と一致することを確認する．違えば停止して報告する．
 3. 箇条書きの中を置き換えるときは，空行を入れない（箇条書きが分断される）．
    入れ子のリストの後に，同じ項目の地の文を続けない（最後の入れ子の項目に
@@ -39,7 +49,7 @@ diff /tmp/replace_old.txt <(sed -n '<開始>,<終了>p' <文書>); echo "exit=$?
 python3 で行範囲だけを置き換える．他の行は触らない．
 
 ```bash
-python3 - <文書> <開始> <終了> /tmp/replace_new.txt <<'EOF'
+python3 - <文書> <開始> <終了> <作業ディレクトリ>/replace_new.txt <<'EOF'
 import sys
 path, s, e, new = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
 with open(path, encoding="utf-8") as f:
@@ -60,7 +70,7 @@ EOF
 ```bash
 diff <(git show origin/main:<文書> | sed -n '1,<開始-1>p') <(sed -n '1,<開始-1>p' <文書>); echo "head_exit=$?"
 diff <(git show origin/main:<文書> | sed -n '<終了+1>,$p') <(sed -n '<E2+1>,$p' <文書>); echo "tail_exit=$?"
-diff /tmp/replace_new.txt <(sed -n '<開始>,<E2>p' <文書>); echo "new_exit=$?"
+diff <作業ディレクトリ>/replace_new.txt <(sed -n '<開始>,<E2>p' <文書>); echo "new_exit=$?"
 git diff -U0 -- <文書> | grep '^@@' | sed 's/ @@.*/ @@/'
 git diff --stat
 ```
@@ -71,7 +81,7 @@ git diff --stat
 ## 手順5: 追加本文の照合
 
 `.claude/ai-loop.json` を Read し，`scanners` のうち `added_lines_only` が true の走査器を，
-`command` の末尾に `/tmp/replace_new.txt` を付けて1つずつ実行する．該当する走査器が
+`command` の末尾に `<作業ディレクトリ>/replace_new.txt` を付けて1つずつ実行する．該当する走査器が
 なければ，この手順は行わない（ファイルがなければ止めて報告する）．
 
 これらの走査器は文書全体には使わない（追加した本文だけを照合する）．
