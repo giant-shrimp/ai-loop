@@ -64,7 +64,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 | スキル | `commander` | 司令塔の手順（`/ai-loop:commander` で呼んだときだけ使う） |
 | スキル | `pre-push-check` | push 前の検証・差分の走査・追加の検査 |
 | スキル | `publish-github` | 確定した本文で Issue・PR を作り，本文の一致を確かめる |
-| スキル | `post-merge-cleanup` | マージ後の後始末（pull・マージの確認・検証・ブランチの削除） |
+| スキル | `post-merge-cleanup` | マージ後の後始末（pull・マージの確認・検証・worktree とブランチの削除） |
 | スキル | `report-self-check` | 報告を送る前の走査器による自己点検 |
 | スキル | `replace-doc-range` | 文書の行範囲を確定した本文に置き換える |
 | スキル | `diagnose-failure` | CI・review・試走の失敗の診断（読み取り専用） |
