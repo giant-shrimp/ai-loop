@@ -1,6 +1,6 @@
 ---
 name: post-merge-cleanup
-description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the default branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks that the PR's base branch matches default_branch in .claude/ai-loop.json (stops if not), checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge; if the PR was merged into a branch other than GitHub's default branch, closing keywords do not auto-close the Issue, so it reports that the user closes it on the GitHub Web), runs the verify command, and safely deletes the now-merged feature branch (local delete after ancestor check, remote via fetch --prune only). Never merges PRs, closes issues, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
+description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the default branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks that the PR's base branch matches default_branch in .claude/ai-loop.json (stops if not), checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge; if the PR was merged into a branch other than GitHub's default branch, closing keywords do not auto-close the Issue, so it reports that the user closes it on the GitHub Web), runs the verify command, and safely deletes the now-merged feature branch (first removes a clean worktree under the commander's /tmp work directory that still has the branch checked out; local delete after ancestor check, remote via fetch --prune only). Never merges PRs, closes issues, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
 ---
 
 # Post-Merge Cleanup
@@ -102,6 +102,18 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
    （このスキルの範囲外の対応が必要なため）．
 
 5. **ブランチの後始末**
+最初に，対象ブランチをチェックアウトしている worktree がないかを確かめる（あると `git branch -d` でローカルのブランチを削除できないため）．
+```
+git worktree list --porcelain
+```
+`branch refs/heads/<branch>` の行を含む項目があれば，その項目の `worktree` の行のパスを，以下 `<wt>` と書く．
+- 該当する項目がない場合：下の「ローカルに存在する場合」に進む．
+- ある場合：次の2条件をどちらも満たすときだけ，`git worktree remove <wt>` で消す（`--force` は使わない）．
+- (1) `<wt>` が，司令塔の作業用ディレクトリの worktree（`/tmp/ai-loop-<リポジトリのルートのディレクトリ名>.` で始まり `/wt` で終わるパス）である．
+- (2) `git -C <wt> status --porcelain` の出力が空である．
+- 消せたら，`<wt>` の親のディレクトリ（司令塔の作業用ディレクトリ．タスクは終わっている）の中身を `ls -A` で報告し，`rm -r` で消す．
+- どちらかの条件を満たさない場合や，`git worktree remove` が失敗した場合は，何も消さずに停止し，`<wt>` と満たさなかった条件を報告する．
+
    対象ブランチがローカルに存在しない場合（GitHub の Web 画面で作成したブランチ等）は，
    ローカル削除は不要とし，リモートの確認（下記の `git fetch --prune`）だけを行う．
 
@@ -136,7 +148,7 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 - リモートブランチの明示的削除（`push origin --delete`）
 - 新しいブランチの作成
 - 次のIssue／タスクへの着手
-- commit / push を伴う一切の変更（後始末はread-only操作とローカルブランチ削除のみ）
+- commit / push を伴う一切の変更（後始末はread-only操作，ローカルブランチの削除，司令塔の作業用ディレクトリの worktree の削除のみ）
 
 ## 出力フォーマット
 
@@ -148,5 +160,5 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 ## 注意
 
 - 途中のいずれかのステップで想定外の状態（PRが未マージ，検証の失敗，
-  手順5の3条件の不成立，`gh api` の失敗）に遭遇したら，そこで止めて報告し，
+  手順5の3条件や worktree の2条件の不成立，`gh api` の失敗）に遭遇したら，そこで止めて報告し，
   以降のステップには進まない．
