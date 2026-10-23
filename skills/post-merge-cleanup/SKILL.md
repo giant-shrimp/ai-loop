@@ -1,6 +1,6 @@
 ---
 name: post-merge-cleanup
-description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the default branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks that the PR's base branch matches default_branch in .claude/ai-loop.json (stops if not), checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge; if the PR was merged into a branch other than GitHub's default branch, closing keywords do not auto-close the Issue, so it reports that the user closes it on the GitHub Web), runs the verify command, and safely deletes the now-merged feature branch (first removes a clean worktree under the commander's /tmp work directory that still has the branch checked out; local delete after ancestor check, remote via fetch --prune only). Never merges PRs, closes issues, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
+description: Use this skill whenever the user reports that they merged a PR via the GitHub GUI (e.g. "mergeは終えた", "マージ完了", "PRをマージした", "merge done"). Directly performs the standard post-merge housekeeping: reads .claude/ai-loop.json, pulls the PR's base branch, confirms via the GitHub REST API (gh api) that the PR landed as merged, checks that the PR's base branch is in allowed_base_branches of .claude/ai-loop.json (defaults to [default_branch]; stops if not), checks whether the linked Issue was auto-closed and, if it is still open, reports that without proposing a close command (auto-close can lag behind the merge; if the PR was merged into a branch other than GitHub's default branch, closing keywords do not auto-close the Issue: when close_issue_on_non_default_merge is true, it runs bin/close_merged_issue.py, which comments on and closes the Issue only if every condition holds; otherwise it reports that the user closes it on the GitHub Web), runs the verify command, and safely deletes the now-merged feature branch (first removes a clean worktree under the commander's /tmp work directory that still has the branch checked out; local delete after ancestor check against the PR's base branch, remote via fetch --prune only). Never merges PRs, closes issues by any other means, or pushes to the default branch itself — the human always merges via GUI first; this skill only runs the cleanup steps afterward, and still stops for explicit confirmation before anything outside its fixed read-only/cleanup scope.
 ---
 
 # Post-Merge Cleanup
@@ -9,6 +9,7 @@ PRのマージは常に人間がGitHub GUIで行う．このスキルは，マ�
 最初に `.claude/ai-loop.json` を Read する．ファイルがない，または `repo`・`default_branch`・`verify` がない場合は，ここで止めて報告する（推測で補わない）．
 同じ会話ですでに Read していて，その後このファイルを変えていない場合は，読み直さなくてよい（Read ツールが「変化なし」と返した場合も読んだものとみなす）．
 以下の `<repo>` は `repo` の値，`<所有者>` はその `/` より前の部分，`<default_branch>` は `default_branch` の値に置き換える．
+`allowed_base_branches`（省略時は `[<default_branch>]`）と `close_issue_on_non_default_merge`（省略時は false）の値も控える．`<base>` は手順1で取得する PR の base（マージ先のブランチ）を指す．
 
 ## いつ使うか
 
@@ -27,7 +28,8 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 - コマンドは1回の Bash 呼び出しに1つだけ実行する．`&&`・`;` でつながない．
 - パイプは読み取り専用の確認と /tmp への書き出しに限る．
 - 合否は Bash ツールの結果がエラーかどうかで判断する．
-- 例外：`git merge-base --is-ancestor` は祖先でないとき終了コード1を返す．これはエラーではなく NO として扱う．手順5の最初の確認（`<branch>` と `<default_branch>`）での NO は squash マージの確認に進み，条件(b)での NO は条件の不成立として停止する．終了コード1以外のエラーは想定外として止める．
+- 例外：`git merge-base --is-ancestor` は祖先でないとき終了コード1を返す．これはエラーではなく NO として扱う．手順5の最初の確認（`<branch>` と `<base>`）での NO は squash マージの確認に進み，条件(b)での NO は条件の不成立として停止する．終了コード1以外のエラーは想定外として止める．
+- 例外：`close_merged_issue.py`（手順3）は，条件を満たさず閉じなかったとき終了コード1を返す．これもエラーではなく「閉じない」として扱う．終了コード2は想定外として止める．
 
 ## 作業用ディレクトリ
 
@@ -43,11 +45,17 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
 
 ## 実行内容（このスキルが直接行う）
 
-1. **`<default_branch>` を最新化**
+1. **PR の base（マージ先）を最新化**
 ```
-   git switch <default_branch>
+   gh api repos/<repo>/pulls/<PR番号> --jq .base.ref
+```
+   出力を `<base>` とする．`<base>` が `allowed_base_branches` に含まれる場合だけ，次を実行する．含まれない場合は実行せず手順2に進む（手順2で停止する）．
+```
+   git fetch origin
+   git switch <base>
    git pull
 ```
+   ローカルに `<base>` がなければ，`git switch <base>` が `origin/<base>` から作る．
 
 2. **マージ結果の確認**（推測せず`gh api`出力で確認する原則）
 ```
@@ -57,7 +65,7 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
    `merged_at` が null でないことを出力で確認する（null なら未マージ）．
    未マージならここで停止し，状況を報告する．
    `head_ref` を手順5の対象ブランチ名として使う．
-   `base_ref` を `.claude/ai-loop.json` の `default_branch` と照合する．違えばここで停止し，状況を報告する．
+   `base_ref` を `.claude/ai-loop.json` の `allowed_base_branches`（省略時は `[<default_branch>]`）と照合する．含まれなければここで停止し，状況を報告する．
 
 3. **対応Issueの状態確認**（Fixes/Closesキーワードの入れ忘れ対策。PRマージ後も
    IssueがOPENのまま残ることがあるため。失敗記録の対象外
@@ -78,9 +86,21 @@ REST API（`gh api`）だけを使う．`gh pr ...`・`gh issue view` に置き�
        `Closes #N` による自動クローズはマージから遅れて反映されることがあるため，
        open のままである旨だけを報告し，時間をおいて再確認するよう案内する
        （`gh issue close` は `.claude/settings.json` または `.claude/settings.local.json` の deny 対象）．
-     - 違う場合：閉じるキーワードによる自動クローズは働かない．open なら，
-       「自動クローズの対象外（既定ブランチ以外へのマージ）．ユーザが GitHub の Web で閉じる」と報告する．
-       時間をおいて再確認する案内はしない．
+     - 違う場合：閉じるキーワードによる自動クローズは働かない．時間をおいて再確認する案内はしない．
+       - `close_issue_on_non_default_merge` が true のとき：プラグインの bin の `close_merged_issue.py` を実行する
+         （番号が指定された場合は `--issue <N>` を付ける）．
+```
+   close_merged_issue.py <PR番号> [--issue <N>]
+```
+         このスクリプトは，設定値・`merged_at`・base・閉じるキーワードの Issue（ちょうど1件．Refs などの参照だけの番号は数えない）・
+         Issue の state を `gh api` で自分で確かめ，すべて満たすときだけ「PR #M（base：<ブランチ名>）のマージで完了」と
+         コメントし，`state_reason=completed` で閉じる．承認は求めない（settings の allow に入っている）．
+         出力の各条件の行（`[OK]`・`[NG]`）・`判定:`・`コメント:`・`クローズ:` の行を書き写して報告する．
+         終了コード1（閉じなかった）なら，NG の条件と「ユーザが GitHub の Web で閉じる」ことを報告する．
+         終了コード2なら停止し，出力の `停止:` の行を報告する．
+         `gh issue close` や `gh api` で Issue を直接閉じない．
+       - false または未設定のとき：open なら，
+         「自動クローズの対象外（既定ブランチ以外へのマージ）．ユーザが GitHub の Web で閉じる」と報告する．
    - **番号の指定がなく，抽出した番号が0件，または異なる複数の番号だった場合**: 自動判定は行わず，
      「対応Issueを特定できなかった」旨を報告するに留める（無関係なIssueを
      誤ってクローズ候補として提示しないため）．
@@ -119,7 +139,7 @@ git worktree list --porcelain
 
    ローカルに存在する場合:
 ```
-   git merge-base --is-ancestor <branch> <default_branch>
+   git merge-base --is-ancestor <branch> <base>
 ```
 
    YESの場合は `git branch -d <branch>` でローカル削除．
@@ -131,10 +151,10 @@ git worktree list --porcelain
 
    次の3条件をすべて確認する．
    (a) 該当 PR がちょうど1件で，`merged_at` が null でない．
-   (b) `git merge-base --is-ancestor <merge_commit_sha> <default_branch>` が YES．
+   (b) `git merge-base --is-ancestor <merge_commit_sha> <base>` が YES．
    (c) `git rev-parse <branch>` が `head_sha` と一致．
    3条件をすべて満たす場合だけ `git branch -D <branch>` でローカル削除．
-   1つでも満たさない場合は削除せず停止し，満たさなかった条件と `git log --format=%h <default_branch>..<branch>` を報告する．
+   1つでも満たさない場合は削除せず停止し，満たさなかった条件と `git log --format=%h <base>..<branch>` を報告する．
    リモートは `git fetch --prune` で状態確認のみ行う．
    GitHub の自動削除により，リモートは通常すでに `[deleted]` になっている．
    既に `[deleted]` なら追加操作は不要．そうでない場合も
@@ -144,7 +164,7 @@ git worktree list --porcelain
 ## このスキルが行わないこと（常に停止して人間の指示を待つ）
 
 - PRのマージ・クローズ・コメント追加
-- Issueのクローズ実行とコマンド案の提示（自動クローズの反映を待つ．既定ブランチ以外へのマージではユーザが GitHub の Web で閉じる．deny対象でもある）
+- Issueのクローズ実行とコマンド案の提示（自動クローズの反映を待つ．既定ブランチ以外へのマージではユーザが GitHub の Web で閉じる．`gh issue close` は deny対象でもある）．例外は，`close_issue_on_non_default_merge` が true のときに手順3で `close_merged_issue.py` を実行することだけ（このスクリプト以外の方法で Issue を閉じない・コメントしない）
 - リモートブランチの明示的削除（`push origin --delete`）
 - 新しいブランチの作成
 - 次のIssue／タスクへの着手
@@ -160,5 +180,5 @@ git worktree list --porcelain
 ## 注意
 
 - 途中のいずれかのステップで想定外の状態（PRが未マージ，検証の失敗，
-  手順5の3条件や worktree の2条件の不成立，`gh api` の失敗）に遭遇したら，そこで止めて報告し，
+  手順5の3条件や worktree の2条件の不成立，`gh api` の失敗，`close_merged_issue.py` の終了コード2）に遭遇したら，そこで止めて報告し，
   以降のステップには進まない．
