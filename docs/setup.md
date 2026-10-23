@@ -124,11 +124,8 @@ init が作る settings は次の形である（`main` は既定ブランチに�
   "permissions": {
     "deny": [
       "Edit(.claude/ai-loop.json)",
-      "Write(.claude/ai-loop.json)",
       "Edit(.claude/ai-loop/verify.sh)",
-      "Write(.claude/ai-loop/verify.sh)",
       "Edit(.claude/settings.json)",
-      "Write(.claude/settings.json)",
       "Bash(git push origin main*)",
       "Bash(git push -f*)",
       "Bash(git push --force*)",
@@ -143,7 +140,7 @@ init が作る settings は次の形である（`main` は既定ブランチに�
 `attribution` と `permissions` の書式は Claude Code の仕様である．詳しくは Claude Code の設定の文書を見る．
 
 - `attribution`：空にすると，コミットと PR に帰属行が付かない．実装役はコミットのトレーラや PR 本文の帰属フッタを付けない
-- `deny`：ai-loop で人が行う操作を入れる．マージ，Issue のクローズ，既定ブランチへの push，force push，検証コマンドと設定ファイルの編集である．deny の対象のファイルは，司令塔も実装役も編集しない．変えるときは commander の 4 節の方式（人が GitHub の Web で編集する）で進める
+- `deny`：ai-loop で人が行う操作を入れる．マージ，Issue のクローズ，既定ブランチへの push，force push，検証コマンドと設定ファイルの編集である．deny の対象のファイルは，司令塔も実装役も編集しない．変えるときは commander の 4 節の方式（人が GitHub の Web で編集する）で進める．`Edit(<パス>)` の deny で Write ツールによる書き込みも止まるので，`Write(<パス>)` の行は書かない（書くと Claude Code の起動時に警告が出る）．
 - 秘密のファイル（`.env` など）：init に `--deny-secret .env` を付けると，`Read(./.env)`・`Edit(./.env)` を deny に入れる．Read の deny は Bash のコマンド（`cat .env` など）までは防げないので，指示の決まり（CLAUDE.md など）にも「読まない・開かない・変えない（コマンドも含む）」と書く
 - `ask`：変更のたびに人が承認したいファイルを入れる．init は空で作る．進め方は commander の 4 節に従う
 

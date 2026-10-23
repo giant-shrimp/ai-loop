@@ -70,11 +70,8 @@ class Report:
 def required_deny(branch, settings_name):
     return [
         "Edit(.claude/ai-loop.json)",
-        "Write(.claude/ai-loop.json)",
         "Edit(.claude/ai-loop/verify.sh)",
-        "Write(.claude/ai-loop/verify.sh)",
         "Edit(.claude/%s)" % settings_name,
-        "Write(.claude/%s)" % settings_name,
         "Bash(git push origin %s*)" % branch,
         "Bash(git push -f*)",
         "Bash(git push --force*)",
