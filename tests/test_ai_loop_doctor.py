@@ -2,7 +2,9 @@
 
 実行: python3 -B -m unittest discover -s tests -v （リポジトリのルートで．-B で __pycache__ を作らない）
 """
+import contextlib
 import importlib.util
+import io
 import os
 import tempfile
 import unittest
@@ -75,6 +77,24 @@ class RequiredDeny(unittest.TestCase):
         self.assertIn("Edit(scripts/verify.sh)", req)
         self.assertNotIn("Edit(.claude/ai-loop/verify.sh)", req)
         self.assertNotIn("Edit(scripts/verify.sh)", doctor.required_deny("main", "settings.json"))
+
+
+class ReportCount(unittest.TestCase):
+    def put(self, r, status):
+        with contextlib.redirect_stdout(io.StringIO()):
+            r.put(status, "D0", "t")
+
+    def test_each_status(self):
+        r = doctor.Report()
+        for status in ("OK", "NG", "SKIP"):
+            self.put(r, status)
+        self.assertEqual((r.ok, r.ng, r.skipped), (1, 1, 1))
+
+    def test_skip_only_is_not_ng(self):
+        r = doctor.Report()
+        self.put(r, "SKIP")
+        self.put(r, "SKIP")
+        self.assertEqual((r.ok, r.ng, r.skipped), (0, 0, 2))
 
 
 if __name__ == "__main__":
