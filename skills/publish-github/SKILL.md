@@ -71,7 +71,7 @@ printf '%s' "$(cat <作業ディレクトリ>/publish_got.md)" | sha256sum
 1. ブランチを push 済みで，pre-push-check を通したことを確認する．
 2. 作成の前に，`check_closing_keywords.py <作業ディレクトリ>/publish_body.md` を実行する．
    - 閉じるキーワード（close・fix・resolve 系とその活用形）は，先頭の1行（`Closes #<Issue番号>`）だけに置く．
-     2行目以降の記録・引用・説明で他の Issue・PR に触れるときは，キーワードの直後に `#N` を置かない
+     2行目以降の記録・引用・説明で他の Issue・PR に触れるときは，キーワードの直後に `#N`・`owner/repo#N`・Issue の URL を置かない
      （例：「本文の閉じるキーワードは #N を指す」）．GitHub の自動クローズで別の Issue を閉じたり，
      post-merge-cleanup と `close_merged_issue.py` が対応 Issue を取り違えたりするため．
    - 終了コードが 0 で，出力の `1行目:` が指示の Issue 番号であることを確かめる．
