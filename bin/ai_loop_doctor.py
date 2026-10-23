@@ -2,7 +2,7 @@
 """ai-loop を使う側のリポジトリの導入状態を診断する．
 
 リポジトリのルートで実行する．項目ごとに [OK]・[NG]・[SKIP] を出し，NG には直し方を出す．
-前の項目が NG で検査できない項目は SKIP と出し，NG と数える．
+前の項目が NG で検査できない項目と，--skip-verify で飛ばした項目は SKIP と出し，NG と別に数える．
 
 使い方:
     python3 <プラグインのパス>/bin/ai_loop_doctor.py [--mode {normal,local}]
@@ -13,7 +13,7 @@
 
 終了コード:
     0  全項目 OK
-    1  NG または SKIP が1件以上
+    1  NG が1件以上（SKIP は数えない）
     2  doctor 自身が動けない（git のリポジトリでない・doctor の例外）
 
 ファイルを変えない（verify.command の実行を除く）．コミット・push・設定の自動修正はしない．
@@ -52,6 +52,7 @@ class Report:
     def __init__(self):
         self.ok = 0
         self.ng = 0
+        self.skipped = 0
 
     def put(self, status, code, title, fixes=(), notes=()):
         print("[%s]%s%s %s" % (status, " " * (5 - len(status)), code, title))
@@ -61,6 +62,8 @@ class Report:
             print("       直し方: %s" % f)
         if status == "OK":
             self.ok += 1
+        elif status == "SKIP":
+            self.skipped += 1
         else:
             self.ng += 1
 
@@ -472,7 +475,7 @@ def diagnose(top, args):
 
     print("注意: このセッションにスキルが読み込まれたかは doctor では分からない．"
           "導入・有効化の後に未実行なら /reload-plugins を実行する")
-    print("結果: OK %d件 / NG %d件" % (r.ok, r.ng))
+    print("結果: OK %d件 / NG %d件 / SKIP %d件" % (r.ok, r.ng, r.skipped))
     return 0 if r.ng == 0 else 1
 
 

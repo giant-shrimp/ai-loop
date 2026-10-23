@@ -35,7 +35,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 - 完了条件：終了コード 0．`SKIPPED` や `  足りない: ...` の行があれば，その一覧をユーザに示し，扱いを確認する（ユーザに確認する箇所）．足りないものは人が settings に足す．Claude Code は settings を編集しない
 
 **S6. 診断する**．通常導入では `python3 <P>/bin/ai_loop_doctor.py`，ローカル専用では `python3 <P>/bin/ai_loop_doctor.py --mode local` を実行する．
-- 出力は項目ごとの `[OK]`・`[NG]`・`[SKIP]` と，NG に付く `直し方: ...` の行，末尾の `結果: OK n件 / NG m件` である
+- 出力は項目ごとの `[OK]`・`[NG]`・`[SKIP]` と，NG に付く `直し方: ...` の行，末尾の `結果: OK n件 / NG m件 / SKIP k件` である
 - NG があれば，`直し方:` に従う．直し方がユーザ操作（push・マージ・settings の編集など）なら，ユーザに依頼する．`.claude/ai-loop.json`・検証コマンド・settings を Edit・Write で直さない（deny の対象）
 - 通常導入では，作ったファイルが既定ブランチに入るまで D15 が NG になる．ブランチ `ai-loop-setup` を作り，init が作ったファイルを1つずつ `git add` してコミットし（帰属行を付けない），push して PR を作り，ユーザにマージを依頼する．マージ後に `git fetch origin` を実行し，`git switch <既定ブランチ>` と `git pull` で手元を既定ブランチに戻してから doctor をもう一度実行する
 - コミットが0件のリポジトリでは D07 が NG になる．手元のブランチ名（`git branch --show-current`）が既定ブランチと違う場合（`init.defaultBranch` が未設定の環境では `master` になる）は，先に `git checkout -b <既定ブランチ>` でそろえる（コミットが0件のブランチは，古い git では `git branch -m` で改名できない）．そのうえで，ユーザに最初のコミットと push を依頼する（例：`! git commit --allow-empty -m "initial commit"` と `! git push -u origin <既定ブランチ>`．通常導入では，最初のコミットに init が作ったファイルを入れてよい）
