@@ -186,7 +186,7 @@ bin の `check_review_comment.sh`・`select_review_comment.sh` は，claude-code
 5. 司令塔が実装役を起動する．実装役はブランチ作成・実装・検証・pre-push-check・push・PR 作成までを行う．
 6. 司令塔が差分・本文・CI・review を確かめ，マージを依頼する．
 7. GitHub で PR をマージする．
-8. `/ai-loop:post-merge-cleanup <PR番号>` で後始末をする．Issue は PR 本文の `Closes #<番号>` で自動でクローズされる．反映が遅れても手動でクローズしない．ただし，PR を GitHub の既定ブランチ以外へマージした場合は，閉じるキーワードで Issue は自動でクローズされない．post-merge-cleanup がそのことを報告するので，GitHub の Web でクローズする．
+8. `/ai-loop:post-merge-cleanup <PR番号>` で後始末をする．Issue は PR 本文の `Closes #<番号>` で自動でクローズされる．反映が遅れても手動でクローズしない．ただし，PR を GitHub の既定ブランチ以外へマージした場合は，閉じるキーワードで Issue は自動でクローズされない．post-merge-cleanup がそのことを報告するので，GitHub の Web でクローズする．既定ブランチ以外へのマージで post-merge-cleanup に Issue を閉じさせる場合は，[config.md](config.md) の `close_issue_on_non_default_merge` を見る．
 
 ## ローカル専用で導入する場合
 

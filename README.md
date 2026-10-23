@@ -57,7 +57,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 - 司令塔が CI と review の結果を読み，採否を決めてユーザにマージを依頼します．マージ後の後始末もスキルで行います．
 - 報告の前には走査器で個人情報などの漏洩を機械的に検査します．コミット・PR に帰属行（Co-Authored-By など）は付けません．
 
-マージ，Issue のクローズ，保護されたファイルの編集は常に人が行います．合否の最終根拠は，AI の承認ではなく検証コマンドと CI の終了コードです．
+マージと保護されたファイルの編集は常に人が行います．Issue のクローズも人が行います．例外は，`close_issue_on_non_default_merge` を true にした場合だけです．このとき，GitHub の既定ブランチ以外へのマージでは，post-merge-cleanup が条件を確かめてから Issue を閉じます（[docs/config.md](docs/config.md)）．合否の最終根拠は，AI の承認ではなく検証コマンドと CI の終了コードです．
 
 ## 中身
 
@@ -77,6 +77,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 | bin | `ai_loop_init.py` | 使う側のリポジトリに設定・検証コマンド・settings・records の雛形を作る（既存のファイルは上書きしない．`--dry-run` で中身を示す） |
 | bin | `ai_loop_doctor.py` | 使う側のリポジトリの導入状態の診断（項目ごとに OK／NG と直し方を出し，終了コードで合否を示す） |
 | bin | `check_review_comment.sh`・`select_review_comment.sh` | review のコメントの特定と判定の補助 |
+| bin | `close_merged_issue.py` | 既定ブランチ以外へマージした PR の対応 Issue を，条件を確かめてから閉じる（`close_issue_on_non_default_merge` が true のとき post-merge-cleanup が使う．`--dry-run` で判定だけを出す） |
 | フック | `hooks/hooks.json`・`bin/one_tool_guard.py` | 1回の応答で2つ以上のツール呼び出しを止める |
 
 ## 前提
@@ -104,7 +105,7 @@ init は使う側のリポジトリに次を作ります．既存のファイル
 
 - `.claude/ai-loop.json`：設定（下の例）．項目の説明と，init が作らない任意の項目（`one_tool_guard` など）は [docs/config.md](docs/config.md) にあります．ファイルや必要な項目がない場合，スキルは推測で補わずに止まります
 - `.claude/ai-loop/verify.sh`：検証コマンド．`--test-command` ならそのコマンドを，`--no-tests` なら構文の検査だけを実行します
-- `.claude/settings.json`（ローカル専用では `.claude/settings.local.json`）：コミット・PR に帰属行が付かないように `attribution` を空にする設定と，権限の deny（マージ・Issue のクローズ・既定ブランチへの push・設定と検証コマンドの編集など）
+- `.claude/settings.json`（ローカル専用では `.claude/settings.local.json`）：コミット・PR に帰属行が付かないように `attribution` を空にする設定と，権限の deny（マージ・Issue のクローズ・既定ブランチへの push・設定と検証コマンドの編集など）．allow は入れません．`close_issue_on_non_default_merge` を true にする場合は，利用者が `permissions.allow` に `Bash(close_merged_issue.py*)` を足します（[docs/config.md](docs/config.md)）
 - records の置き場所（`.claude/ai-loop/ERRORS.md` など）
 
 init が作る `.claude/ai-loop.json` の例（`repo` と `default_branch` は `gh repo view` から取ります）：

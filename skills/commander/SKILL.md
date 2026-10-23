@@ -20,7 +20,7 @@ disable-model-invocation: true
 ## 原則
 
 - 合否の最終根拠は `verify.command` と CI の終了コードとする。AI（司令塔・実装役・review）の承認だけを合格の根拠にしない。
-- マージ、Issue のクローズ、deny 対象のファイルの編集はユーザが行う。司令塔と実装役はしない。
+- マージ、Issue のクローズ、deny 対象のファイルの編集はユーザが行う。司令塔と実装役はしない。例外は、`close_issue_on_non_default_merge` が true のときに post-merge-cleanup が `close_merged_issue.py` で Issue を閉じることだけとする（「5. マージの後」）。
 - 1 Issue 1目的、1 PR 1目的とする。
 - 使う側のリポジトリの CLAUDE.md が、実装の前に必要な手順（測定スクリプトや事前登録のコミットなど）や、決まった局面でだけ使うデータを定めている場合は、その手順を Issue に含め、そのデータの扱いを依頼文に書く。
 - 止まるべき失敗（deny・権限の拒否・分類器エラー・走査器の検出）は自動で回復しない。止めてユーザに報告する。分類器エラーに限り、拒否された主体が単独のコマンドで1回だけ再試行してよい。それでも拒否されたら止める。
@@ -112,7 +112,7 @@ ask 対象のファイル（`.claude/settings.json` または `.claude/settings.
 
 ## 5. マージの後
 
-ユーザがマージした後、`/ai-loop:post-merge-cleanup <PR番号>` を案内する（対応する Issue の番号も添える）。Issue が open のままでも、自動クローズの反映を待ち、手動でクローズしない。ただし、PR を GitHub の既定ブランチ以外へマージした場合は自動クローズが働かないので、ユーザが GitHub の Web で閉じる（post-merge-cleanup がそのことを報告する）。
+ユーザがマージした後、`/ai-loop:post-merge-cleanup <PR番号>` を案内する（対応する Issue の番号も添える）。Issue が open のままでも、自動クローズの反映を待ち、手動でクローズしない。ただし、PR を GitHub の既定ブランチ以外へマージした場合は自動クローズが働かない。`.claude/ai-loop.json` の `close_issue_on_non_default_merge` が true なら、post-merge-cleanup が `close_merged_issue.py` で条件を確かめ、すべて満たすときだけコメントを付けて閉じる（承認は求めない）。false または未設定のとき、または条件を満たさなかったときは、ユーザが GitHub の Web で閉じる（post-merge-cleanup がそのことを報告する）。司令塔は `gh issue close` や `gh api` で Issue を閉じない。
 
 ## 報告の規則
 

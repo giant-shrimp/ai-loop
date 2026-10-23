@@ -7,7 +7,9 @@ ai-loop のスキル・エージェントは，使う側のリポジトリの `.
 | 項目 | 型 | 内容 | 使うスキル・エージェント |
 |---|---|---|---|
 | `repo` | 文字列 | `所有者/リポジトリ名`．gh api のパスに使う | publish-github・post-merge-cleanup・commander・implementer |
-| `default_branch` | 文字列 | 既定ブランチ名．PR を向けるブランチ．GitHub の既定ブランチと違ってよい（その場合，閉じるキーワードで Issue は自動で閉じない．post-merge-cleanup がそのことを報告する） | pre-push-check・post-merge-cleanup・commander・implementer |
+| `default_branch` | 文字列 | 既定ブランチ名．PR を向けるブランチ．GitHub の既定ブランチと違ってよい（その場合，閉じるキーワードで Issue は自動で閉じない．`close_issue_on_non_default_merge` が false なら，post-merge-cleanup がそのことを報告する） | pre-push-check・post-merge-cleanup・commander・implementer |
+| `allowed_base_branches` | 文字列の配列 | 任意（ない場合は `[default_branch]`）．post-merge-cleanup が後始末を進める PR の base（マージ先）の一覧．base がこの一覧にない PR では，手順 2 で止まる．pull とブランチ削除の祖先確認は，PR の base を基準にする | post-merge-cleanup・close_merged_issue.py |
+| `close_issue_on_non_default_merge` | 真偽値 | 任意（ない場合は false）．true なら，GitHub の既定ブランチ以外へのマージで，post-merge-cleanup が `bin/close_merged_issue.py` を実行する．スクリプトは，merged_at・base・閉じるキーワードの Issue（ちょうど 1 件．Refs などの参照だけの番号は数えない）・Issue の state を gh api で確かめ，すべて満たすときだけコメントを付けて `state_reason=completed` で閉じる．承認は求めない．init の settings の雛形には allow の行を入れないので，true にするときは，利用者が settings（`.claude/settings.json` または `.claude/settings.local.json`）の `permissions.allow` に `Bash(close_merged_issue.py*)` を足す（人が編集する．doctor は true のときだけこの行を確かめる）．`Bash(gh issue close*)` の deny は残す．判定だけを確かめるときは `close_merged_issue.py <PR番号> --dry-run` を実行する | post-merge-cleanup・close_merged_issue.py |
 | `python` | 文字列 | Python の実行ファイル（例 `.venv/bin/python`） | なし（今は使うスキルがない．予約） |
 | `verify.command` | 文字列 | 検証コマンド | pre-push-check・post-merge-cleanup・diagnose-failure・commander・implementer |
 | `verify.pass_marker` | 文字列 | 成功を示す出力の目印 | pre-push-check・diagnose-failure |

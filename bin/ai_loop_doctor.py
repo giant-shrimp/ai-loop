@@ -33,6 +33,8 @@ BIN_DIR = os.path.dirname(os.path.abspath(__file__))
 RECORD_KEYS = ("errors", "errors_inventory", "decisions", "trials")
 VERIFY_KEYS = (("command", str), ("pass_marker", str), ("fail_marker", str),
                ("summary_markers", list), ("deny", bool))
+CLOSE_KEY = "close_issue_on_non_default_merge"
+CLOSE_ALLOW = "Bash(close_merged_issue.py*)"
 
 
 def run(args, cwd=None, timeout=60):
@@ -97,6 +99,13 @@ def check_config(config):
     for key in ("scanners", "extra_checks"):
         if not isinstance(config.get(key), list):
             bad.append(key)
+    if CLOSE_KEY in config and not isinstance(config[CLOSE_KEY], bool):
+        bad.append(CLOSE_KEY)
+    if "allowed_base_branches" in config:
+        allowed = config["allowed_base_branches"]
+        if (not isinstance(allowed, list) or not allowed
+                or not all(isinstance(b, str) and b for b in allowed)):
+            bad.append("allowed_base_branches")
     records = config.get("records")
     if not isinstance(records, dict):
         bad.append("records")
@@ -408,6 +417,24 @@ def diagnose(top, args):
         else:
             r.put("NG", "D16", "%s が有効でない" % PLUGIN_ID,
                   ["claude plugin install %s --scope user を実行する" % PLUGIN_ID])
+
+    # D17
+    if not config_ok:
+        r.skip("D17", "settings の allow", "D04 が NG")
+    elif config.get(CLOSE_KEY) is not True:
+        r.put("OK", "D17", "settings の allow（%s が true でないため対象外）" % CLOSE_KEY)
+    elif err or not isinstance(settings, dict):
+        r.skip("D17", "settings の allow", "D12 が NG")
+    else:
+        perms = settings.get("permissions")
+        allow = perms.get("allow") if isinstance(perms, dict) else None
+        allow = allow if isinstance(allow, list) else []
+        if CLOSE_ALLOW in allow:
+            r.put("OK", "D17", ".claude/%s の allow に %s がある" % (settings_name, CLOSE_ALLOW))
+        else:
+            r.put("NG", "D17", "%s が true なのに .claude/%s の allow に %s がない"
+                  % (CLOSE_KEY, settings_name, CLOSE_ALLOW),
+                  ["permissions.allow に %s を足す（人が編集する．docs/config.md を見る）" % CLOSE_ALLOW])
 
     print("注意: このセッションにスキルが読み込まれたかは doctor では分からない．"
           "導入・有効化の後に未実行なら /reload-plugins を実行する")
