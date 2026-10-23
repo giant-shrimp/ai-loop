@@ -77,6 +77,7 @@ Claude Code で「案 → Issue → 実装 → PR → 確認」を回す AI ル�
 | bin | `ai_loop_init.py` | 使う側のリポジトリに設定・検証コマンド・settings・records の雛形を作る（既存のファイルは上書きしない．`--dry-run` で中身を示す） |
 | bin | `ai_loop_doctor.py` | 使う側のリポジトリの導入状態の診断（項目ごとに OK／NG と直し方を出し，終了コードで合否を示す） |
 | bin | `check_review_comment.sh`・`select_review_comment.sh` | review のコメントの特定と判定の補助 |
+| bin | `check_closing_keywords.py` | PR 本文のファイルで，閉じるキーワードと番号が先頭の1行だけにあることを確かめる（publish-github が PR を作る前と，commander が PR 本文を確かめるときに使う） |
 | bin | `close_merged_issue.py` | 既定ブランチ以外へマージした PR の対応 Issue を，条件を確かめてから閉じる（`close_issue_on_non_default_merge` が true のとき post-merge-cleanup が使う．`--dry-run` で判定だけを出す） |
 | フック | `hooks/hooks.json`・`bin/one_tool_guard.py` | 1回の応答で2つ以上のツール呼び出しを止める |
 
