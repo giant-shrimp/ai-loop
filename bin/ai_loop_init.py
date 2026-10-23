@@ -118,11 +118,8 @@ def make_config(repo, branch, show_titles):
 def deny_lines(branch, settings_name, secrets):
     lines = [
         "Edit(.claude/ai-loop.json)",
-        "Write(.claude/ai-loop.json)",
         "Edit(%s)" % VERIFY_PATH,
-        "Write(%s)" % VERIFY_PATH,
         "Edit(.claude/%s)" % settings_name,
-        "Write(.claude/%s)" % settings_name,
         "Bash(git push origin %s*)" % branch,
         "Bash(git push -f*)",
         "Bash(git push --force*)",
