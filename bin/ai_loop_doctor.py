@@ -23,6 +23,7 @@
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -67,17 +68,51 @@ class Report:
         self.put("SKIP", code, "%s（%s）" % (title, reason))
 
 
-def required_deny(branch, settings_name):
+def verify_paths(top, command):
+    """verify.command の語のうち，top からのパスとしてファイルが存在するものを返す．"""
+    paths = []
+    for w in shlex.split(command) if command else []:
+        p = w[2:] if w.startswith("./") else w
+        if p and os.path.isfile(os.path.join(top, p)):
+            paths.append(p)
+    return paths
+
+
+def required_deny(branch, settings_name, verify_files=()):
     return [
         "Edit(.claude/ai-loop.json)",
-        "Edit(.claude/ai-loop/verify.sh)",
         "Edit(.claude/%s)" % settings_name,
+    ] + ["Edit(%s)" % p for p in verify_files] + [
         "Bash(git push origin %s*)" % branch,
         "Bash(git push -f*)",
         "Bash(git push --force*)",
         "Bash(gh pr merge*)",
         "Bash(gh issue close*)",
     ]
+
+
+def bash_rule_matches(rule, command):
+    """Bash(...) の deny の行 rule が command に一致するか（* は空白を含む任意の文字列）．"""
+    if not (rule.startswith("Bash(") and rule.endswith(")")):
+        return False
+    body = rule[len("Bash("):-1]
+    if body.endswith(":*"):
+        body = body[:-2] + "*"
+    pattern = "^" + ".*".join(re.escape(part) for part in body.split("*")) + "$"
+    return re.match(pattern, command, re.DOTALL) is not None
+
+
+def deny_satisfies(required, deny):
+    """必須の行 required を，deny のいずれかの行が同じ意味で止めているか．"""
+    deny = [d for d in deny if isinstance(d, str)]
+    if required.startswith("Edit(") and required.endswith(")"):
+        path = required[len("Edit("):-1]
+        return required in deny or ("Edit(./%s)" % path) in deny
+    if required.startswith("Bash(") and required.endswith("*)"):
+        prefix = required[len("Bash("):-2]
+        return all(any(bash_rule_matches(d, c) for d in deny)
+                   for c in (prefix, prefix + " x"))
+    return required in deny
 
 
 def check_config(config):
@@ -340,7 +375,9 @@ def diagnose(top, args):
             perms = settings.get("permissions")
             deny = perms.get("deny") if isinstance(perms, dict) else None
             deny = deny if isinstance(deny, list) else []
-            missing = [d for d in required_deny(branch, settings_name) if d not in deny]
+            vfiles = verify_paths(top, config["verify"]["command"]) if config["verify"]["deny"] else []
+            missing = [d for d in required_deny(branch, settings_name, vfiles)
+                       if not deny_satisfies(d, deny)]
             if missing:
                 r.put("NG", "D13", ".claude/%s の deny に足りない行がある" % settings_name,
                       ["permissions.deny に次の行を足す（人が編集する）: %s" % "・".join(missing)])

@@ -144,6 +144,12 @@ init が作る settings は次の形である（`main` は既定ブランチに�
 - 秘密のファイル（`.env` など）：init に `--deny-secret .env` を付けると，`Read(./.env)`・`Edit(./.env)` を deny に入れる．Read の deny は Bash のコマンド（`cat .env` など）までは防げないので，指示の決まり（CLAUDE.md など）にも「読まない・開かない・変えない（コマンドも含む）」と書く
 - `ask`：変更のたびに人が承認したいファイルを入れる．init は空で作る．進め方は commander の 4 節に従う
 
+doctor の D13 は，上の各行と同じものを止める deny があれば満たすとする（行の文字列が違ってもよい）．規則は次のとおりである．
+
+- 検証コマンドの Edit の行：`verify.deny` が true のとき，`verify.command` を空白で分けた語のうち，リポジトリのルートからのパス（先頭の `./` は除く）としてファイルが存在するものについて，`Edit(<パス>)` を求める．上の例の `Edit(.claude/ai-loop/verify.sh)` は，検証コマンドが `bash .claude/ai-loop/verify.sh` の場合である．該当するファイルがなければ求めない
+- `Edit(<パス>)` の行：`Edit(<パス>)` または `Edit(./<パス>)` が deny にあれば満たす．`Edit(/<パス>)` の形は受け入れない
+- `Bash(<前置き>*)` の行：`<前置き>` と `<前置き> x` の2つのコマンドが，deny のいずれかの `Bash(...)` の行に一致すれば満たす．一致は，ルールの `*` を空白を含む任意の文字列とみなした全体一致で，ルールの末尾の `:*` は `*` と同じに扱う．たとえば `Bash(gh pr merge)` と `Bash(gh pr merge *)` の2行で `Bash(gh pr merge*)` を満たす．`Bash(git push -f *)` だけでは `Bash(git push -f*)` を満たさない（引数のない `git push -f` を止めないため）
+
 settings が既にある場合，init は上書きせず，足りないもの（`attribution` と deny の各行）を一覧で出す．人がその一覧を見て足す．
 
 ## 4. records の初期状態
