@@ -41,6 +41,27 @@ mktemp -d "/tmp/ai-loop-$(basename "$(git rev-parse --show-toplevel)").XXXXXX"
 - 確定版・取得した本文・review のコメント・worktree は、すべて `<作業ディレクトリ>` の下に置く（例：`<作業ディレクトリ>/<名前>_title.txt`、worktree は `<作業ディレクトリ>/wt`）。/tmp 直下の固定のファイル名は使わない（別のリポジトリやセッションが残したファイルを読んだり上書きしたりしないため）。
 - タスクの最後（PR の照合と worktree の削除が済んだ後）に、`rm -r <作業ディレクトリ>` で消す。途中で止まった場合や、ユーザの承認待ちで応答を終える場合は消さない。このときはフルパスを報告に書き、次の応答でそのパスを使う。
 
+## 着手前と再開前の確認
+
+既存の Issue（`<番号>`）について、次のときに、その Issue の作業が別に進んでいないかを確かめる。読み取りだけで、ロックや目印は作らない。
+
+- 着手前：「2. 下流」または「4. deny 対象・ask 対象の変更」に入る前
+- 再開前：ユーザの手作業（コミット・push・PR の作成・GitHub の Web での編集など）を待った後に作業を再開するとき。ユーザが手元で実行するコマンドを示す前と、PR の照合を再開する前
+
+次のコマンドを1つずつ実行する。
+
+```
+gh api repos/<repo>/issues/<番号> --jq .state
+git branch --list '*/<番号>-*' 'claude/issue-<番号>-*'
+git fetch origin
+git branch -r --list 'origin/*/<番号>-*' 'origin/claude/issue-<番号>-*'
+gh api "repos/<repo>/pulls?state=all&per_page=100" --jq '[.[] | select(((.body // "") | test("(?i)\\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\\s+#<番号>\\b")) or (.head.ref | test("(^|/)(issue-)?<番号>-"))) | {number, state, merged_at, head: .head.ref}]'
+```
+
+- 次のものは数えない。この会話で司令塔が示したブランチ名と、その名前のブランチの PR（再開前に、ユーザが司令塔の手順どおりに作ったもの）。
+- Issue が `open` で、数えないもの以外にブランチも PR も見つからなければ先に進む。
+- Issue が `closed` のとき、または数えないもの以外のブランチ・PR（open・closed・マージ済みを問わない）が1つでも見つかったときは止める。見つかったもの（Issue の state、ブランチ名、PR の番号・state・マージの有無）をユーザに示し、続けるか・やめるかを確かめる。PR のタイトルは `report.show_titles` に従う。ユーザが続けると答えるまで、ブランチ・Issue・PR を作らず、コマンドも示さず、実装役も呼ばない。
+
 ## 1. 上流1：案から Issue へ
 
 1. ユーザの案を読み、目的・受け入れ基準・範囲外を書き出す。不明な点はユーザに質問する。
